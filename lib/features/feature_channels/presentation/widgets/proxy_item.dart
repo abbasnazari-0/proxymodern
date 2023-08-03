@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -81,8 +83,10 @@ class _ProxyItemWidgetState extends State<ProxyItemWidget> {
                 const SizedBox(height: 60),
                 InkWell(
                   onTap: () async {
-                    await adController.adInitilzer?.loadRewarded();
-                    await adController.adInitilzer?.showRewarded();
+                    if (Platform.isAndroid && Platform.isIOS) {
+                      await adController.adInitilzer?.loadRewarded();
+                      await adController.adInitilzer?.showRewarded();
+                    }
                     Share.share(
                         "${controller.channelModel?.data?[widget.index].links}");
                   },
@@ -114,8 +118,10 @@ class _ProxyItemWidgetState extends State<ProxyItemWidget> {
                 const SizedBox(height: 10),
                 InkWell(
                   onTap: () async {
-                    // await adController.adInitilzer?.loadRewarded();
-                    await adController.adInitilzer?.showRewarded();
+                    if (Platform.isAndroid && Platform.isIOS) {
+                      await adController.adInitilzer?.loadRewarded();
+                      await adController.adInitilzer?.showRewarded();
+                    }
                     bool result = await DataExtractor.launchUrl(controller
                             .channelModel?.data?[widget.index].links ??
                         // "tg://proxy?server=84.54.44.145&port=443&secret=ee1603010200010001fc030386e24c3add63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6dee1603010200010001fc030386e24c3addee1603010200010001fc030386e24c3add6b65746161626f6e6c696e652e636f6d"

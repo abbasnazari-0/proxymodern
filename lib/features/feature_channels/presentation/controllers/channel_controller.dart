@@ -78,8 +78,8 @@ class ChannelController extends GetxController {
   Future<String> domainResolvation() async {
     Dio dio = Dio();
 
-    var res = await dio
-        .get("https://proxy-app.s3.ir-thr-at1.arvanstorage.ir/url.txt"); //
+    var res = await dio.get(
+        "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/url.txt"); //
 
     if (res.statusCode != 200) {
       return "https://host.proplayer.space/proxy/";
