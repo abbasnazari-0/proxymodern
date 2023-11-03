@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../features/feature_channels/presentation/pages/channel_screen.dart';
+import 'package:proxymodern/features/feature_splash/presentation/pages/splash_screen.dart';
 
 class MainWrapper extends StatelessWidget {
   const MainWrapper({super.key});
@@ -13,12 +12,12 @@ class MainWrapper extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Color(0xFF082032),
+        scaffoldBackgroundColor: Color.fromARGB(255, 10, 29, 44),
         // app bar color
         appBarTheme: const AppBarTheme(backgroundColor: Colors.deepPurple),
       ),
       debugShowCheckedModeBanner: false,
-      home: ChannelScreen(),
+      home: const SplashScreen(),
     );
   }
 }

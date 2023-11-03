@@ -23,3 +23,9 @@ abstract class MyOpenAd {
   showOpenAd();
   Future<void> disposeOpenAd();
 }
+
+abstract class MyNativeAd {
+  Future<void> loadNativeAd();
+  Widget showNativeAd(BuildContext context);
+  disposeNativeAd();
+}

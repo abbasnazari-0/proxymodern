@@ -10,14 +10,14 @@ import '../controllers/channel_controller.dart';
 import '../widgets/proxy_item.dart';
 
 class ChannelScreen extends StatefulWidget {
-  ChannelScreen({super.key});
+  const ChannelScreen({super.key});
 
   @override
   State<ChannelScreen> createState() => _ChannelScreenState();
 }
 
 class _ChannelScreenState extends State<ChannelScreen> {
-  final adController = Get.put(AdController());
+  final adController = Get.find<AdController>();
 
   final channelController = Get.put(ChannelController());
 
@@ -25,10 +25,10 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
   @override
   void initState() {
-    // TODO: implement initState
+    super.initState();
 
     adController.adInitilzer?.loadRewarded();
-    // adController.adInitilzer?.loadBanner();
+    adController.adInitilzer?.loadBanner();
     // adController.adInitilzer?.loadOpenAd();
     // adController.adInitilzer?.showOpenAd();
   }
@@ -44,54 +44,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
             size: 18,
             color: Colors.white),
         centerTitle: true,
-        actions: [
-          // IconButton(
-          //     onPressed: () {
-          //       Get.dialog(
-          //         Material(
-          //           color: Colors.transparent,
-          //           child: Container(
-          //             width: 40,
-          //             height: 40,
-          //             decoration: BoxDecoration(
-          //                 color: const Color(0xFF222222),
-          //                 borderRadius: BorderRadius.circular(20)),
-          //             margin: const EdgeInsets.symmetric(
-          //                 horizontal: 40, vertical: 120),
-          //             child: Column(
-          //               children: [
-          //                 Row(
-          //                   mainAxisAlignment: MainAxisAlignment.center,
-          //                   children: [
-          //                     IconButton(
-          //                         onPressed: () {
-          //                           Get.back();
-          //                         },
-          //                         icon: const Icon(
-          //                           Iconsax.close_circle,
-          //                           color: Colors.white,
-          //                         )),
-          //                     const SizedBox(width: 10),
-          //                   ],
-          //                 ),
-          //                 const MyText(
-          //                   txt: "راهنمای پروکسی من",
-          //                   textAlign: TextAlign.center,
-          //                   fontWeight: FontWeight.bold,
-          //                   size: 18,
-          //                   color: Colors.white,
-          //                 )
-          //               ],
-          //             ),
-          //           ),
-          //         ),
-          //       );
-          //     },
-          //     icon: const Icon(
-          //       Iconsax.information5,
-          //       color: Colors.white,
-          //     )),
-        ],
+        actions: const [],
       ),
       // bottomNavigationBar: adController.adInitilzer?.showBanner(),
       body: GetBuilder<ChannelController>(builder: (controller) {
@@ -120,38 +73,46 @@ class _ChannelScreenState extends State<ChannelScreen> {
           );
         }
 
-        return SmartRefresher(
-          controller: controller.refreshController,
-          enablePullDown: true,
-          enablePullUp: true,
+        return Column(
+          children: [
+            Expanded(
+              child: SmartRefresher(
+                controller: controller.refreshController,
+                enablePullDown: true,
+                enablePullUp: true,
+                // header: WaterDropHeader(),
+                onRefresh: () async {
+                  controller.getChannel(false);
+                  controller.refreshController.refreshCompleted();
+                },
+                onLoading: () async {
+                  controller.getChannel(true);
+                  controller.refreshController.loadComplete();
+                },
+                child: ListView.builder(
+                  // revers
+                  itemCount: channelController.channelModel?.data?.length ?? 0,
+                  itemBuilder: (context, index) {
+                    String ping = "0";
+                    if (controller.pingList.length > index) {
+                      ping = controller.pingList[index];
+                    } else {
+                      ping = "0";
+                    }
 
-          // header: WaterDropHeader(),
-          onRefresh: () async {
-            controller.getChannel(false);
-            controller.refreshController.refreshCompleted();
-          },
-          onLoading: () async {
-            controller.getChannel(true);
-            controller.refreshController.loadComplete();
-          },
-          child: ListView.builder(
-            // revers
-            shrinkWrap: true,
-            itemCount: channelController.channelModel?.data?.length ?? 0,
-            itemBuilder: (context, index) {
-              String ping = "0";
-              if (controller.pingList.length > index) {
-                ping = controller.pingList[index];
-              } else {
-                ping = "0";
-              }
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: ProxyItemWidget(size: size, ping: ping, index: index),
-              );
-            },
-          ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child:
+                          ProxyItemWidget(size: size, ping: ping, index: index),
+                    );
+                  },
+                ),
+              ),
+            ),
+            GetBuilder<AdController>(builder: (controller) {
+              return controller.adInitilzer?.showBanner() ?? Container();
+            }),
+          ],
         );
       }),
     );

@@ -8,12 +8,15 @@ class AdController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    adInitilzer?.init();
+    adInitilzer?.init(
+      (loaded) {
+        update();
+      },
+    );
   }
 
   @override
   void dispose() {
-    // TODO: implement dispose
     super.dispose();
     adInitilzer?.disposeBanner();
     adInitilzer?.disposeInterstitial();

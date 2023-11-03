@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:proxymodern/core/utils/page_status.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 
-import '../../../../core/utils/constans.dart';
 import '../../../../core/utils/data_extractor.dart';
 import '../../../feature_update/presentation/screens/feature_update.dart';
 import '../../data/model/channel_model.dart';
@@ -32,7 +31,6 @@ class ChannelController extends GetxController {
 
   @override
   void onReady() {
-    // TODO: implement onReady
     super.onReady();
     // print("onReady");
 
@@ -150,29 +148,20 @@ class ChannelController extends GetxController {
 
   getUpdateAvailable() async {
     // get vesion code
-    bool updateAvailable = false;
+
     Dio dio = Dio();
-    var res = await dio.post('https://arianaad.online/updates/proxymodern.php',
-        queryParameters: {
-          "type": "get",
-          "version": versionApplication,
-        });
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    String buildNumber = packageInfo.buildNumber;
+
+    var res = await dio.get(
+        "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/update");
 
     if (res.statusCode == 200) {
       if (Platform.isAndroid || Platform.isIOS) {
         Map data = json.decode(res.data);
 
-        if (data["data"].toString().contains("no update available!")) {
-          updateAvailable = false;
-        } else if (data["data"].toString().contains("update available!")) {
-          updateAvailable = true;
-        } else {
-          updateAvailable = true;
-        }
-        if (updateAvailable) {
-          Get.offAll(() => UpdateScreen(
-                url: data["link"],
-              ));
+        if (int.parse(data["version"]) > int.parse(buildNumber)) {
+          Get.offAll(() => UpdateScreen(url: data["link"]));
         }
       } else {
         // print(res.);

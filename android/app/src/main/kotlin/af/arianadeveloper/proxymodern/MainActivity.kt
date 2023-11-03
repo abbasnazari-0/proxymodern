@@ -1,4 +1,4 @@
-package af.arianadeveloper.proxymodern.proxymodern
+package af.arianadeveloper.proxymodern
 
 import io.flutter.embedding.android.FlutterActivity
 

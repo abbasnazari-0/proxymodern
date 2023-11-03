@@ -52,227 +52,281 @@ class _ProxyItemWidgetState extends State<ProxyItemWidget> {
       onTap: () async {
         if (!widget.clickable) return;
         Get.bottomSheet(
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF222222),
-              // color:  Color,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            height: widget.size.height * 0.5,
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                        onPressed: () {
-                          Get.back();
-                        },
-                        icon: const Icon(
-                          Iconsax.close_circle,
-                          color: Colors.white,
-                        )),
-                    const SizedBox(width: 10),
-                  ],
-                ),
-                ProxyItemWidget(
-                    size: widget.size,
-                    ping: widget.ping,
-                    index: widget.index,
-                    clickable: false),
-                const SizedBox(height: 60),
-                InkWell(
-                  onTap: () async {
-                    if (Platform.isAndroid && Platform.isIOS) {
-                      await adController.adInitilzer?.loadRewarded();
-                      await adController.adInitilzer?.showRewarded();
-                    }
-                    Share.share(
-                        "${controller.channelModel?.data?[widget.index].links}");
-                  },
-                  child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF293A80),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      width: double.infinity,
-                      height: 60,
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          MyText(
-                            txt: "اشتراک گذاری پروکسی",
-                            size: 18,
+          GetBuilder<AdController>(initState: (state) {
+            state.controller?.adInitilzer?.loadRewarded();
+          }, dispose: (state) {
+            state.controller?.adInitilzer?.disposeRewarded();
+          }, builder: (context) {
+            return Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF222222),
+                // color:  Color,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              height: widget.size.height * 0.5,
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                          onPressed: () {
+                            Get.back();
+                          },
+                          icon: const Icon(
+                            Iconsax.close_circle,
                             color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                          Icon(
-                            Icons.share_rounded,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 10),
-                        ],
-                      )),
-                ),
-                const SizedBox(height: 10),
-                InkWell(
-                  onTap: () async {
-                    if (Platform.isAndroid && Platform.isIOS) {
-                      await adController.adInitilzer?.loadRewarded();
-                      await adController.adInitilzer?.showRewarded();
-                    }
-                    bool result = await DataExtractor.launchUrl(controller
-                            .channelModel?.data?[widget.index].links ??
-                        // "tg://proxy?server=84.54.44.145&port=443&secret=ee1603010200010001fc030386e24c3add63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6d63646e2e79656b74616e65742e636f6dee1603010200010001fc030386e24c3addee1603010200010001fc030386e24c3add6b65746161626f6e6c696e652e636f6d"
-                        "");
-
-                    if (!result) {
-                      Get.close(0);
-                      Get.bottomSheet(
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF222222),
-                            // color:  Color,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          height: widget.size.height * 0.5,
-                          width: double.infinity,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                        onPressed: () {
-                                          Get.back();
-                                        },
-                                        icon: const Icon(
-                                          Iconsax.close_circle,
-                                          color: Colors.white,
-                                        )),
-                                    const SizedBox(width: 10),
-                                  ],
-                                ),
-                                const MyText(
-                                  txt:
-                                      "خطا در وصل شدن به پروکسی به صورت خودکار",
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  size: 16,
-                                ),
-                                const SizedBox(height: 10.0),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
-                                  child: MyText(
-                                    txt:
-                                        "نتواستیم بصورت خودکار به پروکسی وصل شویم لطفا مرحله آسان زیر را انجام دهید"
-                                        "\n\n"
-                                        "لینک زیر را کپی کنید",
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                    size: 14,
-                                    textAlign: TextAlign.right,
-                                  ),
-                                ),
-                                const SizedBox(height: 5.0),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  child: SizedBox(
-                                    height: 60,
-                                    child: TextField(
-                                      controller: TextEditingController(
-                                          text:
-                                              "${controller.channelModel?.data?[widget.index].links}"),
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                      decoration: InputDecoration(
-                                          border: const OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                  color: Colors.teal)),
-                                          suffix: IconButton(
-                                              onPressed: () async {
-                                                await Clipboard.setData(
-                                                    ClipboardData(
-                                                        text:
-                                                            "${controller.channelModel?.data?[widget.index].links}"));
-
-                                                Get.snackbar("", "",
-                                                    titleText: const MyText(
-                                                      txt: "با موفقیت کپی شد",
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      size: 16,
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ));
-                                              },
-                                              icon: const Icon(
-                                                Iconsax.copy,
-                                                color: Colors.white,
-                                              ))),
-                                    ),
-                                  ),
-                                ),
-                                const Divider(
-                                  color: Colors.white10,
-                                  thickness: 0.4,
-                                ),
-                                const SizedBox(height: 5.0),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
-                                  child: MyText(
-                                    txt:
-                                        "به تلگرام خود رفته و روی چت Saved Message کلیک کرده و در چت خود Paste نمایید \nارسال کنید\nوقتی ارسال شد روی لینک زده و وصل خواهید شد\n😄😁",
-                                    textAlign: TextAlign.right,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              ],
-                            ),
-                          ),
-                        ),
-                        backgroundColor: Colors.white,
-                        // backgroundColor: Colors.red,
-                        elevation: 1,
-                        enableDrag: true,
-                        shape: RoundedRectangleBorder(
+                          )),
+                      const SizedBox(width: 10),
+                    ],
+                  ),
+                  ProxyItemWidget(
+                      size: widget.size,
+                      ping: widget.ping,
+                      index: widget.index,
+                      clickable: false),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      if (adController.adInitilzer?.hasFullScreenAd == false) {
+                        Get.snackbar("", "",
+                            titleText: const MyText(
+                              txt: "لطفا صبر کنید",
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              size: 16,
+                              textAlign: TextAlign.center,
+                            ));
+                        return;
+                      }
+                      if (Platform.isAndroid || Platform.isIOS) {
+                        // await adController.adInitilzer?.loadRewarded();
+                        await adController.adInitilzer
+                            ?.showRewarded()
+                            .then((value) async {
+                          if (value == 1 || value == 0) {
+                            await Future.delayed(
+                                const Duration(milliseconds: 1000), () async {
+                              await Share.share(
+                                  "${controller.channelModel?.data?[widget.index].links}");
+                            });
+                          }
+                        });
+                      }
+                    },
+                    child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF293A80),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                      );
-                    }
-                  },
-                  child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF39422),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      width: double.infinity,
-                      height: 60,
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          MyText(
-                            txt: "وصل شدن سریع",
-                            size: 18,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w900,
-                          ),
-                          Icon(
-                            Icons.shortcut_rounded,
-                            color: Colors.black,
-                          ),
-                          SizedBox(width: 10),
-                        ],
-                      )),
-                )
-              ],
-            ),
-          ),
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        width: double.infinity,
+                        height: 60,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            MyText(
+                              txt: "اشتراک گذاری پروکسی",
+                              size: 18,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            Icon(
+                              Icons.share_rounded,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 10),
+                          ],
+                        )),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      bool result = false;
+                      if (adController.adInitilzer?.hasFullScreenAd == false) {
+                        Get.snackbar("", "",
+                            titleText: const MyText(
+                              txt: "لطفا صبر کنید",
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              size: 16,
+                              textAlign: TextAlign.center,
+                            ));
+                        return;
+                      }
+                      if (Platform.isAndroid || Platform.isIOS) {
+                        // await adController.adInitilzer?.loadRewarded();
+                        await adController.adInitilzer
+                            ?.showRewarded()
+                            .then((value) async {
+                          if (value == 1 || value == 0) {
+                            await Future.delayed(
+                                const Duration(milliseconds: 3000), () async {
+                              result = await DataExtractor.launchUrl(controller
+                                      .channelModel
+                                      ?.data?[widget.index]
+                                      .links ??
+                                  "");
+                            });
+                          }
+                        });
+
+                        if (!result) {
+                          Get.close(0);
+                          Get.bottomSheet(
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF222222),
+                                // color:  Color,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              height: widget.size.height * 0.5,
+                              width: double.infinity,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        IconButton(
+                                            onPressed: () {
+                                              Get.back();
+                                            },
+                                            icon: const Icon(
+                                              Iconsax.close_circle,
+                                              color: Colors.white,
+                                            )),
+                                        const SizedBox(width: 10),
+                                      ],
+                                    ),
+                                    const MyText(
+                                      txt:
+                                          "خطا در وصل شدن به پروکسی به صورت خودکار",
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(height: 10.0),
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 10),
+                                      child: MyText(
+                                        txt:
+                                            "نتواستیم بصورت خودکار به پروکسی وصل شویم لطفا مرحله آسان زیر را انجام دهید"
+                                            "\n\n"
+                                            "لینک زیر را کپی کنید",
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                        size: 14,
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5.0),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
+                                      child: SizedBox(
+                                        height: 60,
+                                        child: TextField(
+                                          controller: TextEditingController(
+                                              text:
+                                                  "${controller.channelModel?.data?[widget.index].links}"),
+                                          style: const TextStyle(
+                                              color: Colors.white),
+                                          decoration: InputDecoration(
+                                              border: const OutlineInputBorder(
+                                                  borderSide: BorderSide(
+                                                      color: Colors.teal)),
+                                              suffix: IconButton(
+                                                  onPressed: () async {
+                                                    await Clipboard.setData(
+                                                        ClipboardData(
+                                                            text:
+                                                                "${controller.channelModel?.data?[widget.index].links}"));
+
+                                                    Get.snackbar("", "",
+                                                        titleText: const MyText(
+                                                          txt:
+                                                              "با موفقیت کپی شد",
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          size: 16,
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ));
+                                                  },
+                                                  icon: const Icon(
+                                                    Iconsax.copy,
+                                                    color: Colors.white,
+                                                  ))),
+                                        ),
+                                      ),
+                                    ),
+                                    const Divider(
+                                      color: Colors.white10,
+                                      thickness: 0.4,
+                                    ),
+                                    const SizedBox(height: 5.0),
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 10),
+                                      child: MyText(
+                                        txt:
+                                            "به تلگرام خود رفته و روی چت Saved Message کلیک کرده و در چت خود Paste نمایید \nارسال کنید\nوقتی ارسال شد روی لینک زده و وصل خواهید شد\n😄😁",
+                                        textAlign: TextAlign.right,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ),
+                            backgroundColor: Colors.white,
+                            // backgroundColor: Colors.red,
+                            elevation: 1,
+                            enableDrag: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF39422),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        width: double.infinity,
+                        height: 60,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            MyText(
+                              txt: "وصل شدن سریع",
+                              size: 18,
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            Icon(
+                              Icons.shortcut_rounded,
+                              color: Colors.black,
+                            ),
+                            SizedBox(width: 10),
+                          ],
+                        )),
+                  ),
+                  const SizedBox(height: 10),
+                  // GetBuilder<AdController>(builder: (controller) {
+                  //   return controller.adInitilzer?.showBanner() ?? Container();
+                  // }),
+                ],
+              ),
+            );
+          }),
           backgroundColor: Colors.white,
           // backgroundColor: Colors.red,
           elevation: 1,
