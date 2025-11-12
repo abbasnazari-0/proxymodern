@@ -51,12 +51,25 @@ class ChannelController extends GetxController {
       if (withload) itemCount += 20;
     }
     url ??= await domainResolvation();
-    url ??= "https://host.proplayer.space/proxy/";
+    url ??= "https://api.v1.te.cinimo.ir/proxy/";
 
     Dio dio = Dio();
 
-    var res =
-        await dio.get("${url}index.php?limit_count=$itemCount&channel=all");
+    String platform = '';
+
+    if (Platform.isAndroid) {
+      platform = 'android';
+    } else if (Platform.isIOS) {
+      platform = 'ios';
+    } else if (Platform.isWindows) {
+      platform = 'windows';
+    }
+
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    String buildNumber = packageInfo.buildNumber;
+
+    var res = await dio.get(
+        "${url}index.php?limit_count=$itemCount&channel=all&platform=$platform&version=$buildNumber");
     channelModel = ChannelModel.fromJson((res.data));
 
     if (res.statusCode != 200) {
@@ -80,7 +93,7 @@ class ChannelController extends GetxController {
         "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/url.txt"); //
 
     if (res.statusCode != 200) {
-      return "https://host.proplayer.space/proxy/";
+      return "https://api.v1.te.cinimo.ir/proxy/";
     }
     Map urlMap = jsonDecode(res.data);
 
@@ -97,7 +110,7 @@ class ChannelController extends GetxController {
 
     var res = await dio.get("https://ipapi.co/$ip/country/");
     if (res.statusCode != 200) {
-      return "https://host.proplayer.space/proxy/";
+      return "https://api.v1.te.cinimo.ir/proxy/";
     }
     return res.data;
   }

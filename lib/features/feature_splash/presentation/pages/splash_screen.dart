@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:proxymodern/core/ad/ad_controller.dart';
 
 import 'package:proxymodern/features/feature_channels/presentation/pages/channel_screen.dart';
 
@@ -12,10 +11,9 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final adController = Get.put(AdController());
-
   @override
   void initState() {
+    print('ddd');
     super.initState();
     // adController.adInitilzer?.loadOpenAd();
     // adController.adInitilzer?.showOpenAd();

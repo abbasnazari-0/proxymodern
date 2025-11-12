@@ -7,15 +7,10 @@ class MainWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('ddd');
     return GetMaterialApp(
       title: 'Pro Telegram Proxy',
-      theme: ThemeData(
-        useMaterial3: true,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Color.fromARGB(255, 10, 29, 44),
-        // app bar color
-        appBarTheme: const AppBarTheme(backgroundColor: Colors.deepPurple),
-      ),
+      theme: ThemeData(),
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
     );

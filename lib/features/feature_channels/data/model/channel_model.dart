@@ -2,12 +2,15 @@ class ChannelModel {
   String? result;
   String? message;
   List<ChannelModelData>? data;
+  Setting? setting;
 
-  ChannelModel({this.result, this.message, this.data});
+  ChannelModel({this.result, this.message, this.data, this.setting});
 
   ChannelModel.fromJson(Map<String, dynamic> json) {
     result = json['result'];
     message = json['message'];
+    setting =
+        json['setting'] != null ? Setting.fromJson(json['setting']) : null;
     if (json['data'] != null) {
       data = <ChannelModelData>[];
       json['data'].forEach((v) {
@@ -23,6 +26,39 @@ class ChannelModel {
     if (this.data != null) {
       data['data'] = this.data!.map((v) => v.toJson()).toList();
     }
+    return data;
+  }
+}
+
+class Setting {
+  String? version;
+  String? updateTitle;
+  String? updateDesc;
+  String? udateUrl;
+  bool? shouldUpdate;
+
+  Setting(
+      {this.version,
+      this.updateTitle,
+      this.updateDesc,
+      this.udateUrl,
+      this.shouldUpdate});
+
+  Setting.fromJson(Map<String, dynamic> json) {
+    version = json['version'];
+    updateTitle = json['update_title'];
+    updateDesc = json['update_desc'];
+    udateUrl = json['update_url'];
+    shouldUpdate = bool.parse(json['should_update'].toString());
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['version'] = version;
+    data['update_title'] = updateTitle;
+    data['update_desc'] = updateDesc;
+    data['update_url'] = udateUrl;
+    data['should_update'] = shouldUpdate;
     return data;
   }
 }
