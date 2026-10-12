@@ -19,6 +19,18 @@ class DataExtractor {
     return "";
   }
 
+  static String? queryParam(String link, String key) {
+    return Uri.tryParse(link.trim())?.queryParameters[key];
+  }
+
+  static String protocolLabel(String link) {
+    final uri = Uri.tryParse(link.trim());
+    if (uri == null) return "MTProto";
+    final blob = "${uri.host} ${uri.path}".toLowerCase();
+    if (blob.contains("socks")) return "SOCKS5";
+    return "MTProto";
+  }
+
   static Color pingColor(String ping) {
     if (ping == "نامشخص") {
       return Colors.grey.shade500;
@@ -44,13 +56,16 @@ class DataExtractor {
 
   static Future<int> pingWithPort(String address, String port) async {
     final stopwatch = Stopwatch()..start();
+    Socket? socket;
 
     try {
-      await Socket.connect(address, int.parse(port),
+      socket = await Socket.connect(address, int.parse(port),
           timeout: const Duration(seconds: 1));
       return stopwatch.elapsedMilliseconds;
     } catch (e) {
       return -1;
+    } finally {
+      socket?.destroy();
     }
   }
 
