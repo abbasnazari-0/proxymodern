@@ -3,14 +3,20 @@ class ChannelModel {
   String? message;
   List<ChannelModelData>? data;
   Setting? setting;
+  AdConfig? ads;
 
-  ChannelModel({this.result, this.message, this.data, this.setting});
+  ChannelModel(
+      {this.result, this.message, this.data, this.setting, this.ads});
 
   ChannelModel.fromJson(Map<String, dynamic> json) {
     result = json['result'];
     message = json['message'];
     setting =
         json['setting'] != null ? Setting.fromJson(json['setting']) : null;
+    // The backend currently merges the ad config into "setting"; also support
+    // a dedicated "ads" object if it moves there later.
+    final adsJson = json['ads'] ?? json['setting'];
+    ads = adsJson != null ? AdConfig.fromJson(adsJson) : null;
     if (json['data'] != null) {
       data = <ChannelModelData>[];
       json['data'].forEach((v) {
@@ -59,6 +65,65 @@ class Setting {
     data['update_desc'] = updateDesc;
     data['update_url'] = udateUrl;
     data['should_update'] = shouldUpdate;
+    return data;
+  }
+}
+
+class AdConfig {
+  String? appId;
+  String? interstitialUnitId;
+  List<String>? relayEndpoints;
+  int? timezoneOffsetMinutes;
+  String? countryCode;
+  String? languageCode;
+  List<String>? languageTags;
+  String? networkOperatorCode;
+  int? prxAa;
+  int? adsDisplayStatus;
+
+  AdConfig(
+      {this.appId,
+      this.interstitialUnitId,
+      this.relayEndpoints,
+      this.timezoneOffsetMinutes,
+      this.countryCode,
+      this.languageCode,
+      this.languageTags,
+      this.networkOperatorCode,
+      this.prxAa,
+      this.adsDisplayStatus});
+
+  AdConfig.fromJson(Map<String, dynamic> json) {
+    appId = json['app_id'];
+    interstitialUnitId = json['interstitial_unit_id'];
+    if (json['relay_endpoints'] != null) {
+      relayEndpoints = List<String>.from(json['relay_endpoints']);
+    }
+    timezoneOffsetMinutes = json['timezone_offset_minutes'];
+    countryCode = json['country_code'];
+    languageCode = json['language_code'];
+    if (json['language_tags'] != null) {
+      languageTags = List<String>.from(json['language_tags']);
+    }
+    networkOperatorCode = json['network_operator_code'];
+    prxAa = json['prx_aa'];
+    adsDisplayStatus = json['ads_display_status'] != null
+        ? int.tryParse(json['ads_display_status'].toString())
+        : null;
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['app_id'] = appId;
+    data['interstitial_unit_id'] = interstitialUnitId;
+    data['relay_endpoints'] = relayEndpoints;
+    data['timezone_offset_minutes'] = timezoneOffsetMinutes;
+    data['country_code'] = countryCode;
+    data['language_code'] = languageCode;
+    data['language_tags'] = languageTags;
+    data['network_operator_code'] = networkOperatorCode;
+    data['prx_aa'] = prxAa;
+    data['ads_display_status'] = adsDisplayStatus;
     return data;
   }
 }

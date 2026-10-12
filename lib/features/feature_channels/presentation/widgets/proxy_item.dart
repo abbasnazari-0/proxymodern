@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/ping_service.dart';
 import '../controllers/channel_controller.dart';
-import 'proxy_found_sheet.dart';
+import 'proxy_info_sheet.dart';
 
 class ProxyItemWidget extends StatelessWidget {
   const ProxyItemWidget({
@@ -145,13 +146,14 @@ class ProxyItemWidget extends StatelessWidget {
   Widget _pingBadge() {
     final loading = ping == "0";
     final pingValue = int.tryParse(ping);
+    final success = !loading && pingValue != null && pingValue > 0;
     final color = loading
         ? _muted
-        : (pingValue != null && pingValue > 0
+        : success
             ? DataExtractor.pingColor(ping)
-            : _muted);
+            : const Color(0xFFFF6B6B);
 
-    return Container(
+    final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF0C141C),
@@ -159,18 +161,19 @@ class ProxyItemWidget extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: loading
-          ? SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _accent.withValues(alpha: 0.8),
+          ? const Text(
+              "…",
+              style: TextStyle(
+                fontFamily: "vazir",
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: _muted,
               ),
             )
           : Column(
               children: [
                 Text(
-                  pingValue != null && pingValue > 0 ? "$pingValue" : "—",
+                  success ? "$pingValue" : "-1",
                   style: TextStyle(
                     fontFamily: "vazir",
                     fontSize: 14,
@@ -189,12 +192,42 @@ class ProxyItemWidget extends StatelessWidget {
               ],
             ),
     );
+
+    return Tooltip(
+      message: _detailText(_controller.pingResults[index]),
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: loading ? null : () => _controller.pingOne(index),
+        child: badge,
+      ),
+    );
+  }
+
+  String _detailText(PingResult? result) {
+    if (result == null) {
+      return "برای اندازه‌گیری دوباره ضربه بزن";
+    }
+    if (!result.isAlive) {
+      return "پاسخ نداد (پینگ -1)\nبرای اندازه‌گیری دوباره ضربه بزن";
+    }
+    return [
+      "پینگ: ${result.latency} ms",
+      "کمینه: ${result.min} ms",
+      "بیشینه: ${result.max} ms",
+      "میانگین: ${result.avg} ms",
+      "نوسان: ${result.jitter} ms",
+      "اتلاف: ${result.loss.toStringAsFixed(0)}%",
+    ].join("\n");
   }
 
   void _openActions(BuildContext context) {
-    ProxyFoundSheet.show(
+    ProxyInfoSheet.show(
       link: _link,
-      caption: _title,
+      title: _title,
+      server: DataExtractor.queryParam(_link, "server") ?? "",
+      port: DataExtractor.queryParam(_link, "port") ?? "",
+      ping: ping,
     );
   }
 }

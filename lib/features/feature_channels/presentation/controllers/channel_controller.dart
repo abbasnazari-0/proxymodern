@@ -8,6 +8,9 @@ import 'package:proxymodern/core/utils/page_status.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/ping_service.dart';
+import '../../../../core/utils/proxy_report_service.dart';
+import '../../../../core/utils/relay_ads_service.dart';
 import '../../../feature_update/presentation/screens/feature_update.dart';
 import '../../data/model/channel_model.dart';
 
@@ -17,7 +20,6 @@ class ChannelController extends GetxController {
   static const Duration _minInitialLoad = Duration(milliseconds: 550);
   static const Duration _minFindDuration = Duration(milliseconds: 900);
   static const Duration _requestTimeout = Duration(seconds: 14);
-  static const Duration _pingStagger = Duration(milliseconds: 40);
 
   String? url;
   ChannelModel? channelModel;
@@ -34,6 +36,13 @@ class ChannelController extends GetxController {
   String errorTitle = "لیست دریافت نشد";
   String errorMessage = "اتصال را بررسی کن و دوباره تلاش کن.";
   FindPhase findPhase = FindPhase.idle;
+
+  final PingService _ping = PingService();
+  final Map<int, PingResult> pingResults = {};
+  int pingDone = 0;
+  int pingTotal = 0;
+  bool pingRunning = false;
+  int _pingGeneration = 0;
 
   @override
   Future<void> onInit() async {
@@ -109,6 +118,9 @@ class ChannelController extends GetxController {
       }
 
       final parsed = ChannelModel.fromJson(res.data);
+      // Feed the ad config (app id, unit id, relay endpoints, timezone, ...)
+      // straight to the ad SDK. Missing/null fields are simply ignored.
+      RelayAdsService.instance.applyConfig(parsed.ads);
       final items = parsed.data ?? <ChannelModelData>[];
 
       if (items.isEmpty) {
@@ -263,22 +275,6 @@ class ChannelController extends GetxController {
     return best;
   }
 
-  int? _fallbackIndex(List<int> indexes, List<ChannelModelData> data) {
-    for (final i in indexes) {
-      final link = data[i].links ?? "";
-      final host = DataExtractor.queryParam(link, "server");
-      final port = DataExtractor.queryParam(link, "port");
-      if (host != null &&
-          host.isNotEmpty &&
-          port != null &&
-          port.isNotEmpty &&
-          link.isNotEmpty) {
-        return i;
-      }
-    }
-    return indexes.isEmpty ? null : indexes.first;
-  }
-
   /// Pings the loaded list and returns the fastest responding proxy.
   Future<int?> findWorkingProxy({int? excludeIndex}) async {
     final startedAt = DateTime.now();
@@ -314,17 +310,47 @@ class ChannelController extends GetxController {
       return null;
     }
 
+    // Freshness window: re-probe endpoints whose result is missing or stale
+    // so the selected proxy is always backed by a recent measurement.
+    final staleBefore = DateTime.now().subtract(const Duration(seconds: 20));
     final needsPing = indexes.where((i) {
       final ping = int.tryParse(pingList[i]) ?? 0;
-      return ping <= 0;
+      if (ping <= 0) return true;
+      final measuredAt = pingResults[i]?.measuredAt;
+      return measuredAt == null || measuredAt.isBefore(staleBefore);
     }).toList();
 
     if (needsPing.isNotEmpty) {
-      await Future.wait(needsPing.map((i) => _pingAt(i, data[i])));
+      final gen = ++_pingGeneration;
+      final targets = <PingTarget>[];
+      for (final i in needsPing) {
+        final link = data[i].links ?? "";
+        final host = DataExtractor.queryParam(link, "server");
+        final port = int.tryParse(DataExtractor.queryParam(link, "port") ?? "");
+        if (host == null || host.isEmpty || port == null) {
+          pingList[i] = "-1";
+          pingResults[i] = PingResult.failed;
+        } else {
+          targets.add(PingTarget(i, host, port));
+        }
+      }
+
+      if (targets.isNotEmpty) {
+        await _ping.pingBatch(
+          targets,
+          isCancelled: () => gen != _pingGeneration,
+          onResult: (target, result) {
+            if (gen != _pingGeneration) return;
+            pingList[target.index] = result.latency.toString();
+            pingResults[target.index] = result;
+          },
+        );
+      }
     }
 
-    var best = _bestPingIndex(indexes);
-    best ??= _fallbackIndex(indexes, data);
+    // Only consider proxies that actually responded to the ping. If none of
+    // them answered, we surface an error instead of connecting to a dead one.
+    final best = _bestPingIndex(indexes);
 
     final elapsed = DateTime.now().difference(startedAt);
     if (elapsed < _minFindDuration) {
@@ -352,10 +378,18 @@ class ChannelController extends GetxController {
     final port = DataExtractor.queryParam(link, "port");
     if (host == null || host.isEmpty || port == null || port.isEmpty) {
       pingList[index] = "-1";
+      pingResults[index] = PingResult.failed;
       return;
     }
-    final ping = await DataExtractor.pingWithPort(host, port);
-    pingList[index] = ping.toString();
+    final parsedPort = int.tryParse(port);
+    if (parsedPort == null) {
+      pingList[index] = "-1";
+      pingResults[index] = PingResult.failed;
+      return;
+    }
+    final result = await _ping.pingHost(host, parsedPort);
+    pingList[index] = result.latency.toString();
+    pingResults[index] = result;
   }
 
   Future<String> domainResolvation() async {
@@ -387,21 +421,120 @@ class ChannelController extends GetxController {
     return res.data;
   }
 
-  Future<void> startPingList() async {
+  Future<void> startPingList({bool forceAll = false}) async {
     final data = channelModel?.data;
     if (data == null || data.isEmpty) return;
 
-    pingList = List<String>.filled(data.length, "0");
+    final gen = ++_pingGeneration;
+
+    // Resize pingList to match the data, preserving already-measured values
+    // unless forceAll is requested. This keeps "load more" (pull-up) from
+    // re-pinging the items that were already measured at the top of the list.
+    if (forceAll) {
+      pingList = List<String>.filled(data.length, "0");
+      pingResults.clear();
+    } else if (pingList.length < data.length) {
+      pingList = [
+        ...pingList,
+        ...List<String>.filled(data.length - pingList.length, "0"),
+      ];
+    } else if (pingList.length > data.length) {
+      pingList = pingList.sublist(0, data.length);
+      pingResults.removeWhere((key, _) => key >= data.length);
+    }
+
+    pingRunning = true;
+    pingTotal = data.length;
+    pingDone = 0;
     update();
 
+    var alreadyDone = 0;
+    var invalidCount = 0;
+    final targets = <PingTarget>[];
     for (var i = 0; i < data.length; i++) {
-      if (pingList.length != data.length) break;
-      if (pingList[i] != "0") continue;
+      final existing = int.tryParse(pingList[i]);
+      if (!forceAll && existing != null && existing != 0) {
+        alreadyDone++;
+        continue;
+      }
 
-      await _pingAt(i, data[i]);
-      update();
-      await Future.delayed(_pingStagger);
+      final link = data[i].links ?? "";
+      final host = DataExtractor.queryParam(link, "server");
+      final port = int.tryParse(DataExtractor.queryParam(link, "port") ?? "");
+      if (host == null || host.isEmpty || port == null) {
+        pingList[i] = "-1";
+        pingResults[i] = PingResult.failed;
+        ProxyReportService.instance.addFailedProxy(
+          proxyId: data[i].id,
+          link: data[i].links,
+          ping: -1,
+        );
+        invalidCount++;
+      } else {
+        targets.add(PingTarget(i, host, port));
+      }
     }
+
+    pingDone = alreadyDone + invalidCount;
+    update();
+
+    if (targets.isNotEmpty) {
+      await _ping.pingBatch(
+        targets,
+        isCancelled: () => gen != _pingGeneration,
+        onResult: (target, result) {
+          if (gen != _pingGeneration) return;
+          pingList[target.index] = result.latency.toString();
+          pingResults[target.index] = result;
+          if (result.latency <= 0) {
+            ProxyReportService.instance.addFailedProxy(
+              proxyId: data[target.index].id,
+              link: data[target.index].links,
+              ping: result.latency,
+            );
+          }
+        },
+        onProgress: (done, _) {
+          if (gen != _pingGeneration) return;
+          pingDone = alreadyDone + invalidCount + done;
+          update();
+        },
+      );
+    }
+
+    // Flush any remaining failed-proxy reports (end of this ping cycle).
+    await ProxyReportService.instance.flush();
+
+    if (gen == _pingGeneration) {
+      pingRunning = false;
+      pingDone = pingTotal;
+      update();
+    }
+  }
+
+  /// Re-measures a single proxy on demand (used by the list's ping badge).
+  Future<void> pingOne(int index) async {
+    final data = channelModel?.data;
+    if (data == null || index < 0 || index >= data.length) return;
+    if (pingList.length <= index) {
+      pingList = [
+        ...pingList,
+        ...List<String>.filled(data.length - pingList.length, "0"),
+      ];
+    }
+    pingList[index] = "0";
+    pingResults.remove(index);
+    update();
+    await _pingAt(index, data[index]);
+    update();
+  }
+
+  /// Re-measures every proxy without reloading the list.
+  Future<void> refreshPings() async {
+    final data = channelModel?.data;
+    if (data == null || data.isEmpty) return;
+    _pingGeneration++;
+    await startPingList(forceAll: true);
   }
 
   getCountryFlag(String ip) async {

@@ -7,6 +7,7 @@ import '../../../../core/utils/constans.dart';
 import '../../../../core/utils/data_extractor.dart';
 import '../../../../core/utils/get_storage_data.dart';
 import '../../../../core/utils/page_status.dart';
+import '../../../../core/utils/relay_ads_service.dart';
 import '../controllers/channel_controller.dart';
 import '../widgets/app_about_sheet.dart';
 import '../widgets/legacy_mode_toggle.dart';
@@ -138,6 +139,10 @@ class _ModernChannelViewState extends State<_ModernChannelView>
       return;
     }
 
+    // Proxy found successfully → show one interstitial before the result.
+    await RelayAdsService.instance.showOneAd();
+    if (!mounted) return;
+
     await ProxyFoundSheet.show(
       link: link,
       caption: item?.title?.trim().isNotEmpty == true
@@ -156,6 +161,10 @@ class _ModernChannelViewState extends State<_ModernChannelView>
     if (channelController.pingList.length <= _index!) return "—";
     final value = int.tryParse(channelController.pingList[_index!]) ?? -1;
     if (value <= 0) return "—";
+    final result = channelController.pingResults[_index!];
+    if (result != null && result.isAlive && result.jitter >= 0) {
+      return "$value ms · نوسان ${result.jitter}";
+    }
     return "$value ms";
   }
 

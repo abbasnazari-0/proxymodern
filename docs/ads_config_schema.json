@@ -1,0 +1,16 @@
+{
+  "app_id": "ca-app-pub-6702651244858806~3019875033",
+  "interstitial_unit_id": "ca-app-pub-6702651244858806/1234567890",
+  "relay_endpoints": [
+    "https://kamserv1.info:8443/",
+    "https://kiamoto2.info/",
+    "https://poiiopa3.info/",
+    "https://marjan4.info/"
+  ],
+  "timezone_offset_minutes": 210,
+  "country_code": "IR",
+  "language_code": "fa",
+  "language_tags": ["fa", "fa-IR"],
+  "network_operator_code": "43211",
+  "prx_aa": 1
+}

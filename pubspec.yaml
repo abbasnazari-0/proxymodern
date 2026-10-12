@@ -38,6 +38,12 @@ dependencies:
   package_info_plus: ^4.2.0
   gap: ^3.0.1
 
+  # Android-only interstitial ads via the relay proxy (GMA Next-Gen SDK).
+  relay_ads_flutter:
+    git:
+      url: https://github.com/abbasnazari-0/relay_ads_flutter.git
+      ref: master
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

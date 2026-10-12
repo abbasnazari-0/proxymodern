@@ -119,6 +119,16 @@ class _LegacyChannelViewState extends State<LegacyChannelView> {
                             ],
                           ),
                         ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: "پینگ مجدد همه",
+                          onPressed: () => channelController.refreshPings(),
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                         LegacyModeToggle(
                           enabled: widget.legacyEnabled,
                           onChanged: widget.onLegacyChanged,
@@ -193,6 +203,9 @@ class _LegacyChannelViewState extends State<LegacyChannelView> {
       return "فعلاً سروری نیست";
     }
     if (count == 0) return "در حال آماده‌سازی";
+    if (controller.pingRunning) {
+      return "اندازه‌گیری پینگ ${controller.pingDone}/${controller.pingTotal}";
+    }
     return "$count سرور برای انتخاب";
   }
 
