@@ -82,7 +82,6 @@ class RelayAdsService {
     }
   }
 
-  /// Loads one interstitial into the ready slot (does not show it).
   Future<void> preload() async {
     if (!isSupported || !_started || !_adsEnabled) return;
     try {
@@ -116,7 +115,6 @@ class RelayAdsService {
     }
   }
 
-  /// Loads then shows a single interstitial.
   Future<void> showOneAd() async {
     if (!_loaded) {
       await preload();
@@ -124,8 +122,6 @@ class RelayAdsService {
     await showLoaded();
   }
 
-  /// Loads a previously cached ad config (saved after the last successful
-  /// fetch) so the splash ad can use the real backend values on later launches.
   Future<void> loadCachedConfig() async {
     try {
       final raw = GetStorageData.getData(storageKeyAdConfig);
