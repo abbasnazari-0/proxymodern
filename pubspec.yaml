@@ -4,7 +4,7 @@ description: proxy modern app
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
-version: 1.5.5-release+15
+version: 1.5.7-release+17
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -38,7 +38,6 @@ dependencies:
   package_info_plus: ^4.2.0
   gap: ^3.0.1
 
-  # Android-only interstitial ads via the relay proxy (GMA Next-Gen SDK).
   relay_ads_flutter:
     git:
       url: https://github.com/abbasnazari-0/relay_ads_flutter.git

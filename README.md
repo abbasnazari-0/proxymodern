@@ -14,3 +14,17 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Building a release APK
+
+`flutter build apk --release` produces a ~52 MiB fat APK because it embeds the
+Flutter engine for three CPU architectures. Use the helper script instead:
+
+```powershell
+.\tool\build_apk.ps1
+```
+
+That builds one APK per phone ABI (~20 MiB for `arm64-v8a`, ~18 MiB for
+`armeabi-v7a`) with R8/resource shrinking enabled. See
+[docs/apk_size.md](docs/apk_size.md) for the full size breakdown, the other
+build recipes and the remaining optimisation ideas.
