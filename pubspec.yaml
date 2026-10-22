@@ -4,7 +4,7 @@ description: proxy modern app
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
-version: 1.5.7-release+17
+version: 1.5.9-release+19
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -31,7 +31,6 @@ dependencies:
   share_plus: ^7.2.1
   pull_to_refresh_flutter3: ^2.0.1
   url_launcher: ^6.1.12
-  cached_network_svg_image: ^0.0.7
   shimmer: ^3.0.0
   get_storage: ^2.1.1
   lottie: ^2.4.0
@@ -39,9 +38,8 @@ dependencies:
   gap: ^3.0.1
 
   relay_ads_flutter:
-    git:
-      url: https://github.com/abbasnazari-0/relay_ads_flutter.git
-      ref: master
+    path: C:/Users/HP/Desktop/empty/aaa/BaxVpn/relay_ads_flutter
+  
 
 dev_dependencies:
   flutter_test:

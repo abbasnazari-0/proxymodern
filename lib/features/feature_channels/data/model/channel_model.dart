@@ -72,7 +72,17 @@ class Setting {
 class AdConfig {
   String? appId;
   String? interstitialUnitId;
-  List<String>? relayEndpoints;
+  String? proxyUrl;
+  String? proxyUsername;
+  String? proxyPassword;
+  String? proxyMode;
+  int? showSplashAd;
+  int? showConnectAd;
+  String? connectInterstitialUnitId;
+  int? adMinIntervalSeconds;
+  int? adMaxPerSession;
+  int? adRetryCount;
+  int? proxyTtlSeconds;
   int? timezoneOffsetMinutes;
   String? countryCode;
   String? languageCode;
@@ -84,7 +94,17 @@ class AdConfig {
   AdConfig(
       {this.appId,
       this.interstitialUnitId,
-      this.relayEndpoints,
+      this.proxyUrl,
+      this.proxyUsername,
+      this.proxyPassword,
+      this.proxyMode,
+      this.showSplashAd,
+      this.showConnectAd,
+      this.connectInterstitialUnitId,
+      this.adMinIntervalSeconds,
+      this.adMaxPerSession,
+      this.adRetryCount,
+      this.proxyTtlSeconds,
       this.timezoneOffsetMinutes,
       this.countryCode,
       this.languageCode,
@@ -96,9 +116,29 @@ class AdConfig {
   AdConfig.fromJson(Map<String, dynamic> json) {
     appId = json['app_id'];
     interstitialUnitId = json['interstitial_unit_id'];
-    if (json['relay_endpoints'] != null) {
-      relayEndpoints = List<String>.from(json['relay_endpoints']);
-    }
+    proxyUrl = json['proxy_url'];
+    proxyUsername = json['proxy_username'];
+    proxyPassword = json['proxy_password'];
+    proxyMode = json['proxy_mode'];
+    showSplashAd = json['show_splash_ad'] != null
+        ? int.tryParse(json['show_splash_ad'].toString())
+        : null;
+    showConnectAd = json['show_connect_ad'] != null
+        ? int.tryParse(json['show_connect_ad'].toString())
+        : null;
+    connectInterstitialUnitId = json['connect_interstitial_unit_id'];
+    adMinIntervalSeconds = json['ad_min_interval_seconds'] != null
+        ? int.tryParse(json['ad_min_interval_seconds'].toString())
+        : null;
+    adMaxPerSession = json['ad_max_per_session'] != null
+        ? int.tryParse(json['ad_max_per_session'].toString())
+        : null;
+    adRetryCount = json['ad_retry_count'] != null
+        ? int.tryParse(json['ad_retry_count'].toString())
+        : null;
+    proxyTtlSeconds = json['proxy_ttl_seconds'] != null
+        ? int.tryParse(json['proxy_ttl_seconds'].toString())
+        : null;
     timezoneOffsetMinutes = json['timezone_offset_minutes'];
     countryCode = json['country_code'];
     languageCode = json['language_code'];
@@ -116,7 +156,17 @@ class AdConfig {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['app_id'] = appId;
     data['interstitial_unit_id'] = interstitialUnitId;
-    data['relay_endpoints'] = relayEndpoints;
+    data['proxy_url'] = proxyUrl;
+    data['proxy_username'] = proxyUsername;
+    data['proxy_password'] = proxyPassword;
+    data['proxy_mode'] = proxyMode;
+    data['show_splash_ad'] = showSplashAd;
+    data['show_connect_ad'] = showConnectAd;
+    data['connect_interstitial_unit_id'] = connectInterstitialUnitId;
+    data['ad_min_interval_seconds'] = adMinIntervalSeconds;
+    data['ad_max_per_session'] = adMaxPerSession;
+    data['ad_retry_count'] = adRetryCount;
+    data['proxy_ttl_seconds'] = proxyTtlSeconds;
     data['timezone_offset_minutes'] = timezoneOffsetMinutes;
     data['country_code'] = countryCode;
     data['language_code'] = languageCode;

@@ -62,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen> {
     await ads.init();
     // Small delay so the Android Activity is fully resumed before the ad.
     await Future.delayed(const Duration(milliseconds: 600));
-    await ads.showOneAd();
+    await ads.showSplashAd();
 
     await minDelay;
     if (mounted) {

@@ -118,9 +118,10 @@ class ChannelController extends GetxController {
       }
 
       final parsed = ChannelModel.fromJson(res.data);
-      // Feed the ad config (app id, unit id, relay endpoints, timezone, ...)
-      // straight to the ad SDK. Missing/null fields are simply ignored.
-      RelayAdsService.instance.applyConfig(parsed.ads);
+      // Feed the ad config (app id, unit id, proxy, timezone, ...) straight
+      // to the ad SDK. Missing/null fields are simply ignored. Starting here
+      // (startIfReady) so a fresh install shows the ad on the first launch.
+      RelayAdsService.instance.applyConfig(parsed.ads, startIfReady: true);
       final items = parsed.data ?? <ChannelModelData>[];
 
       if (items.isEmpty) {
@@ -393,18 +394,26 @@ class ChannelController extends GetxController {
   }
 
   Future<String> domainResolvation() async {
-    Dio dio = Dio();
-
-    var res = await dio.get(
-        "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/url.txt"); //
-
-    if (res.statusCode != 200) {
-      return "https://api.v1.te.cinimo.ir/proxy/";
+    try {
+      final dio = Dio(BaseOptions(
+        connectTimeout: _requestTimeout,
+        receiveTimeout: _requestTimeout,
+      ));
+      final res = await dio.get(
+          "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/url.txt");
+      if (res.statusCode == 200) {
+        final urlMap = jsonDecode(res.data);
+        final resolved = urlMap["url"];
+        if (resolved is String && resolved.isNotEmpty) {
+          url = resolved;
+          return resolved;
+        }
+      }
+    } catch (_) {
+      // GitHub raw is blocked/unreachable in some networks (e.g. Iran);
+      // fall back to the hardcoded backend URL.
     }
-    Map urlMap = jsonDecode(res.data);
-
-    url = urlMap["url"];
-    return urlMap["url"];
+    return "https://api.v1.te.cinimo.ir/proxy/";
   }
 
   updateScreen() {
@@ -552,25 +561,27 @@ class ChannelController extends GetxController {
   }
 
   getUpdateAvailable() async {
-    // get vesion code
+    // Best-effort update check. GitHub raw is blocked in some networks (Iran),
+    // so never let it crash or spam unhandled exceptions.
+    try {
+      Dio dio = Dio();
+      PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      String buildNumber = packageInfo.buildNumber;
 
-    Dio dio = Dio();
-    PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    String buildNumber = packageInfo.buildNumber;
+      var res = await dio.get(
+          "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/update");
 
-    var res = await dio.get(
-        "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/update");
+      if (res.statusCode == 200) {
+        if (Platform.isAndroid || Platform.isIOS) {
+          Map data = json.decode(res.data);
 
-    if (res.statusCode == 200) {
-      if (Platform.isAndroid || Platform.isIOS) {
-        Map data = json.decode(res.data);
-
-        if (int.parse(data["version"]) > int.parse(buildNumber)) {
-          Get.offAll(() => UpdateScreen(url: data["link"]));
+          if (int.parse(data["version"]) > int.parse(buildNumber)) {
+            Get.offAll(() => UpdateScreen(url: data["link"]));
+          }
         }
-      } else {
-        // print(res.);
       }
+    } catch (_) {
+      // ignore — update availability must not break the app
     }
   }
 }
