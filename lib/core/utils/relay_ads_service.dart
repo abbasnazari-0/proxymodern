@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:relay_ads_flutter/relay_ads_flutter.dart';
 
 import '../../features/feature_channels/data/model/channel_model.dart';
@@ -57,10 +55,6 @@ class RelayAdsService {
   // Frequency capping state.
   DateTime? _lastAdShownAt;
   int _adsShownThisSession = 0;
-
-  // Pending load error, shown once the UI is ready (deferred so we never touch
-  // the overlay from the splash boot, where the overlay is not ready yet).
-  String? _pendingLoadError;
 
   /// Builds the effective Shifter username. In 'sticky' mode a unique per-launch
   /// session id is appended so all requests in this app run share one exit IP.
@@ -118,9 +112,10 @@ class RelayAdsService {
   }
 
   /// Starts the native relay + SDK with the current proxy config.
-  Future<void> _startRelay() async {
-    if (!isSupported || !_adsEnabled) return;
-    if (_proxyUrl == null || _proxyUrl!.isEmpty) return;
+  /// Returns true when the relay reached a ready state.
+  Future<bool> _startRelay() async {
+    if (!isSupported || !_adsEnabled) return false;
+    if (_proxyUrl == null || _proxyUrl!.isEmpty) return false;
     try {
       final status = await RelayAds.instance.start(RelayAdsConfig(
         appId: _appId,
@@ -133,8 +128,10 @@ class RelayAdsService {
       ));
       _started = true;
       debugPrint('RelayAds: start OK -> ${status.state.name}');
+      return true;
     } catch (e) {
       debugPrint('RelayAds: start FAILED -> $e');
+      return false;
     }
   }
 
@@ -158,12 +155,17 @@ class RelayAdsService {
         debugPrint(
             'RelayAds: load OK (attempt $attempt) -> ${status.state.name}');
         return true;
-      } catch (e, st) {
+      } catch (e) {
         debugPrint(
             'RelayAds: load FAILED (attempt $attempt/$maxAttempts) -> $e');
-        if (attempt >= maxAttempts) {
+        final message = e.toString();
+        // Permanent errors (no fill / account not approved / invalid request)
+        // won't succeed on retry, so stop immediately instead of rotating.
+        final retryable = !(message.contains('NO_FILL') ||
+            message.contains('Account not approved') ||
+            message.contains('INVALID_REQUEST'));
+        if (!retryable || attempt >= maxAttempts) {
           _loaded = false;
-          _pendingLoadError = '$e\n\n$st';
           return false;
         }
         await _rotateAndRestart();
@@ -195,7 +197,15 @@ class RelayAdsService {
     }
     _started = false;
     _loaded = false;
-    await _startRelay();
+    // The native stop() releases the loopback port asynchronously; give it a
+    // moment and retry if the port is still held (transient EADDRINUSE).
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      if (await _startRelay()) return;
+    }
+    debugPrint('RelayAds: restart FAILED after retries');
   }
 
   /// Measures the TCP connect latency (ms) to a relay URL, or null when it is
@@ -336,25 +346,6 @@ class RelayAdsService {
     await _showAd(unit);
   }
 
-  /// Shows the pending ad-load error in a dialog that auto-dismisses after 10
-  /// seconds. Must be called once the UI is ready (after the splash → channel
-  /// navigation), so the error is only stored during the splash boot.
-  Future<void> showPendingLoadErrorIfAny() async {
-    final details = _pendingLoadError;
-    if (details == null) return;
-    _pendingLoadError = null;
-    if (!isSupported) return;
-    try {
-      Get.dialog(
-        _AdLoadErrorDialog(details: details),
-        barrierDismissible: true,
-        barrierColor: Colors.black54,
-      );
-    } catch (e) {
-      debugPrint('RelayAds: failed to show load-error dialog -> $e');
-    }
-  }
-
   Future<void> loadCachedConfig() async {
     try {
       final raw = GetStorageData.getData(storageKeyAdConfig);
@@ -401,6 +392,10 @@ class RelayAdsService {
     _proxyUsername = config.proxyUsername ?? _proxyUsername;
     _proxyPassword = config.proxyPassword ?? _proxyPassword;
     _proxyMode = config.proxyMode ?? _proxyMode;
+    // Use the backend-verified sticky session id (no client-side pre-warm).
+    if (config.proxySessionId != null && config.proxySessionId!.isNotEmpty) {
+      _sessionId = config.proxySessionId;
+    }
 
     // Backend may return 1–3 relay URLs. Keep the full list so we can ping all
     // of them in parallel and pick the fastest one.
@@ -452,6 +447,7 @@ class RelayAdsService {
         proxyUsername: _proxyUsername,
         proxyPassword: _proxyPassword,
         proxyMode: _proxyMode,
+        proxySessionId: _sessionId,
         showSplashAd: _showSplashAd ? 1 : 0,
         showConnectAd: _showConnectAd ? 1 : 0,
         connectInterstitialUnitId: _connectInterstitialUnitId,
@@ -488,111 +484,3 @@ String? pickFastestRelay(List<(String, int?)> probes) {
   }
   return best;
 }
-
-class _AdLoadErrorDialog extends StatefulWidget {
-  const _AdLoadErrorDialog({required this.details});
-
-  final String details;
-
-  @override
-  State<_AdLoadErrorDialog> createState() => _AdLoadErrorDialogState();
-}
-
-class _AdLoadErrorDialogState extends State<_AdLoadErrorDialog> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer(const Duration(seconds: 10), () {
-      if (!mounted) return;
-      final route = ModalRoute.of(context);
-      if (route == null) return;
-      if (route.isCurrent) {
-        Navigator.of(context, rootNavigator: true).pop();
-      } else {
-        Navigator.of(context, rootNavigator: true).removeRoute(route);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF101820),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Color(0xFFFF6B6B),
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'خطای لود تبلیغ',
-                    style: TextStyle(
-                      fontFamily: 'vazir',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Get.back(),
-                  icon: const Icon(Icons.close, color: Colors.white54, size: 20),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.maxFinite,
-              constraints: const BoxConstraints(maxHeight: 320),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0C141C),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  widget.details,
-                  textDirection: TextDirection.ltr,
-                  style: const TextStyle(
-                    fontFamily: 'vazir',
-                    fontSize: 13,
-                    color: Color(0xFFFFB3B3),
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'این پیام تا ۱۰ ثانیه دیگر بسته می‌شود.',
-              style: TextStyle(
-                fontFamily: 'vazir',
-                fontSize: 11,
-                color: Color(0xFF8B97A6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-

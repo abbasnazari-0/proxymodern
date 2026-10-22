@@ -30,9 +30,6 @@ class _ChannelScreenState extends State<ChannelScreen> {
     Get.put(ChannelController());
     final saved = GetStorageData.getData(storageKeyLegacyListMode);
     _legacyListMode = saved == true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      RelayAdsService.instance.showPendingLoadErrorIfAny();
-    });
   }
 
   Future<void> _setLegacyListMode(bool enabled) async {
@@ -144,7 +141,6 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
     // Proxy found successfully → show the connect interstitial before the result.
     await RelayAdsService.instance.showConnectAd();
-    RelayAdsService.instance.showPendingLoadErrorIfAny();
     if (!mounted) return;
 
     await ProxyFoundSheet.show(

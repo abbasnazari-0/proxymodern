@@ -78,6 +78,7 @@ class AdConfig {
   String? proxyUsername;
   String? proxyPassword;
   String? proxyMode;
+  String? proxySessionId;
   int? showSplashAd;
   int? showConnectAd;
   String? connectInterstitialUnitId;
@@ -102,6 +103,7 @@ class AdConfig {
       this.proxyUsername,
       this.proxyPassword,
       this.proxyMode,
+      this.proxySessionId,
       this.showSplashAd,
       this.showConnectAd,
       this.connectInterstitialUnitId,
@@ -126,6 +128,7 @@ class AdConfig {
     proxyUsername = json['proxy_username'];
     proxyPassword = json['proxy_password'];
     proxyMode = json['proxy_mode'];
+    proxySessionId = json['proxy_session_id'];
     showSplashAd = json['show_splash_ad'] != null
         ? int.tryParse(json['show_splash_ad'].toString())
         : null;
@@ -168,6 +171,7 @@ class AdConfig {
     data['proxy_username'] = proxyUsername;
     data['proxy_password'] = proxyPassword;
     data['proxy_mode'] = proxyMode;
+    data['proxy_session_id'] = proxySessionId;
     data['show_splash_ad'] = showSplashAd;
     data['show_connect_ad'] = showConnectAd;
     data['connect_interstitial_unit_id'] = connectInterstitialUnitId;
