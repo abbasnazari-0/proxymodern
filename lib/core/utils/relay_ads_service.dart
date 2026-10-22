@@ -38,6 +38,8 @@ class RelayAdsService {
 
   // Optional direct forward-proxy (e.g. Shifter) that replaces the Bax relay.
   String? _proxyUrl;
+  List<String> _proxyCandidates = const [];
+  bool _selectingRelay = false;
   String? _proxyUsername;
   String? _proxyPassword;
   String _proxyMode = 'rotation'; // 'rotation' (fresh IP per request) or 'sticky' (fixed IP per app launch)
@@ -196,6 +198,75 @@ class RelayAdsService {
     await _startRelay();
   }
 
+  /// Measures the TCP connect latency (ms) to a relay URL, or null when it is
+  /// unreachable. Every relay forwards to the same Shifter endpoint, so the
+  /// only variable is the user→relay round-trip time — a plain connect is the
+  /// right "ping" here.
+  Future<int?> _pingRelay(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return null;
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    final stopwatch = Stopwatch()..start();
+    try {
+      final socket = await Socket.connect(uri.host, port,
+          timeout: const Duration(seconds: 3));
+      stopwatch.stop();
+      socket.destroy();
+      return stopwatch.elapsedMilliseconds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Pings every configured relay in parallel and returns the fastest reachable
+  /// one (lowest TCP connect latency). Falls back to the current proxy if every
+  /// relay is down.
+  Future<String?> _selectFastestRelay() async {
+    final candidates = _proxyCandidates
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .toList();
+    if (candidates.isEmpty) return _proxyUrl;
+    if (candidates.length == 1) return candidates.first;
+
+    final probes = await Future.wait(candidates.map((url) async {
+      final latencyMs = await _pingRelay(url);
+      return (url, latencyMs);
+    }));
+
+    final best = pickFastestRelay(probes);
+    if (best != null) {
+      debugPrint('RelayAds: fastest relay -> $best');
+    } else {
+      debugPrint('RelayAds: all relays unreachable; keeping $_proxyUrl');
+    }
+    return best ?? _proxyUrl;
+  }
+
+  /// Runs the parallel ping, adopts the fastest relay, and (re)starts the SDK.
+  Future<void> _selectRelayAndStart() async {
+    if (_selectingRelay) return;
+    _selectingRelay = true;
+    try {
+      final chosen = await _selectFastestRelay();
+      if (chosen == null || chosen.isEmpty) {
+        if (!_started) await init();
+        return;
+      }
+      final changed = chosen != _proxyUrl;
+      _proxyUrl = chosen;
+      _cacheMergedConfig();
+      if (!_started) {
+        await init();
+      } else if (changed) {
+        await _restartRelay();
+      }
+    } finally {
+      _selectingRelay = false;
+    }
+  }
+
   /// Shows the previously loaded interstitial, if one is ready.
   Future<bool> showLoaded() async {
     if (!isSupported || !_started || !_loaded || !_adsEnabled) return false;
@@ -327,14 +398,21 @@ class RelayAdsService {
         config.timezoneOffsetMinutes ?? _timezoneOffsetMinutes;
     _networkOperatorCode = config.networkOperatorCode ?? _networkOperatorCode;
     _prxAa = config.prxAa ?? _prxAa;
-    final oldProxyUrl = _proxyUrl;
-    final oldProxyUsername = _proxyUsername;
-    final oldProxyPassword = _proxyPassword;
-    final oldProxyMode = _proxyMode;
-    _proxyUrl = config.proxyUrl ?? _proxyUrl;
     _proxyUsername = config.proxyUsername ?? _proxyUsername;
     _proxyPassword = config.proxyPassword ?? _proxyPassword;
     _proxyMode = config.proxyMode ?? _proxyMode;
+
+    // Backend may return 1–3 relay URLs. Keep the full list so we can ping all
+    // of them in parallel and pick the fastest one.
+    final incoming = config.proxyCandidates;
+    if (incoming.isNotEmpty) {
+      _proxyCandidates = incoming;
+    }
+    // Fresh install (no cache) has no proxy yet; seed it with the first
+    // candidate so init()/splash has something to use before selection runs.
+    if (_proxyUrl == null || _proxyUrl!.isEmpty) {
+      _proxyUrl = _proxyCandidates.isNotEmpty ? _proxyCandidates.first : null;
+    }
     _showSplashAd =
         config.showSplashAd != null ? config.showSplashAd == 1 : _showSplashAd;
     _showConnectAd =
@@ -354,26 +432,23 @@ class RelayAdsService {
           'RelayAds: ads disabled (ads_display_status=${config.adsDisplayStatus})');
       return;
     }
-    final proxyChanged = oldProxyUrl != _proxyUrl ||
-        oldProxyUsername != _proxyUsername ||
-        oldProxyPassword != _proxyPassword ||
-        oldProxyMode != _proxyMode;
-    if (startIfReady && !_started &&
-        _proxyUrl != null && _proxyUrl!.isNotEmpty) {
-      init();
-    } else if (startIfReady && _started && proxyChanged) {
-      // The proxy config changed while the relay was running; restart it so
-      // the new proxy takes effect immediately.
-      _restartRelay();
+    if (startIfReady) {
+      // Ping every relay in parallel, adopt the fastest, then start/restart.
+      unawaited(_selectRelayAndStart());
     }
   }
 
   void _cacheMergedConfig() {
     try {
+      final others = _proxyCandidates
+          .where((url) => url != _proxyUrl)
+          .toList(growable: false);
       final merged = AdConfig(
         appId: _appId,
         interstitialUnitId: _interstitialUnitId,
         proxyUrl: _proxyUrl,
+        proxyUrl2: others.isNotEmpty ? others[0] : null,
+        proxyUrl3: others.length > 1 ? others[1] : null,
         proxyUsername: _proxyUsername,
         proxyPassword: _proxyPassword,
         proxyMode: _proxyMode,
@@ -397,6 +472,21 @@ class RelayAdsService {
       // ignore
     }
   }
+}
+
+/// Picks the relay URL with the lowest non-null latency (ms), or null if every
+/// relay timed out. Exposed for unit testing.
+String? pickFastestRelay(List<(String, int?)> probes) {
+  String? best;
+  int? bestMs;
+  for (final (url, ms) in probes) {
+    if (ms == null) continue;
+    if (bestMs == null || ms < bestMs) {
+      bestMs = ms;
+      best = url;
+    }
+  }
+  return best;
 }
 
 class _AdLoadErrorDialog extends StatefulWidget {

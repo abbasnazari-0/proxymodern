@@ -73,6 +73,8 @@ class AdConfig {
   String? appId;
   String? interstitialUnitId;
   String? proxyUrl;
+  String? proxyUrl2;
+  String? proxyUrl3;
   String? proxyUsername;
   String? proxyPassword;
   String? proxyMode;
@@ -95,6 +97,8 @@ class AdConfig {
       {this.appId,
       this.interstitialUnitId,
       this.proxyUrl,
+      this.proxyUrl2,
+      this.proxyUrl3,
       this.proxyUsername,
       this.proxyPassword,
       this.proxyMode,
@@ -117,6 +121,8 @@ class AdConfig {
     appId = json['app_id'];
     interstitialUnitId = json['interstitial_unit_id'];
     proxyUrl = json['proxy_url'];
+    proxyUrl2 = json['proxy_url_2'];
+    proxyUrl3 = json['proxy_url_3'];
     proxyUsername = json['proxy_username'];
     proxyPassword = json['proxy_password'];
     proxyMode = json['proxy_mode'];
@@ -157,6 +163,8 @@ class AdConfig {
     data['app_id'] = appId;
     data['interstitial_unit_id'] = interstitialUnitId;
     data['proxy_url'] = proxyUrl;
+    data['proxy_url_2'] = proxyUrl2;
+    data['proxy_url_3'] = proxyUrl3;
     data['proxy_username'] = proxyUsername;
     data['proxy_password'] = proxyPassword;
     data['proxy_mode'] = proxyMode;
@@ -175,6 +183,15 @@ class AdConfig {
     data['prx_aa'] = prxAa;
     data['ads_display_status'] = adsDisplayStatus;
     return data;
+  }
+
+  /// All configured relay URLs (primary + backups), empty entries filtered out.
+  List<String> get proxyCandidates {
+    return <String>[
+      if (proxyUrl != null && proxyUrl!.isNotEmpty) proxyUrl!,
+      if (proxyUrl2 != null && proxyUrl2!.isNotEmpty) proxyUrl2!,
+      if (proxyUrl3 != null && proxyUrl3!.isNotEmpty) proxyUrl3!,
+    ];
   }
 }
 
