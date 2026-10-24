@@ -59,6 +59,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Use the cached backend ad config from the last launch (if any).
     await ads.loadCachedConfig();
+    // Fetch a FRESH backend config so the splash ad uses a fresh, pre-warmed
+    // sticky session instead of a stale cached one (which times out).
+    await ads.refreshConfigFromBackend();
     await ads.init();
     // Small delay so the Android Activity is fully resumed before the ad.
     await Future.delayed(const Duration(milliseconds: 600));

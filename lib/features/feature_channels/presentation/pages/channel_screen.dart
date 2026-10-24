@@ -117,6 +117,10 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
     HapticFeedback.mediumImpact();
 
+    // Preload the connect ad in parallel with the proxy search so the ad is
+    // ready (or already failed) by the time the proxy is found.
+    final adFuture = RelayAdsService.instance.preloadConnectAd();
+
     final index = await c.findWorkingProxy(excludeIndex: exclude);
     if (!mounted) return;
 
@@ -139,16 +143,56 @@ class _ModernChannelViewState extends State<_ModernChannelView>
       return;
     }
 
-    // Proxy found successfully → show the connect interstitial before the result.
-    await RelayAdsService.instance.showConnectAd();
+    final caption = item?.title?.trim().isNotEmpty == true
+        ? item!.title!.trim()
+        : "پروکسی آماده اتصال است";
+
+    // Wait for the ad (semi-black loading overlay while it is still loading).
+    // If the ad failed, fall through and show the proxy dialog anyway.
+    final adReady = await _waitForConnectAd(adFuture);
     if (!mounted) return;
+
+    if (adReady) {
+      await RelayAdsService.instance.showLoaded();
+      if (!mounted) return;
+    }
 
     await ProxyFoundSheet.show(
       link: link,
-      caption: item?.title?.trim().isNotEmpty == true
-          ? item!.title!.trim()
-          : "پروکسی آماده اتصال است",
+      caption: caption,
     );
+  }
+
+  /// Waits for the connect ad, showing a semi-black loading overlay while it
+  /// is still loading. Returns true when the ad is ready to show.
+  Future<bool> _waitForConnectAd(Future<bool> adFuture) async {
+    final ads = RelayAdsService.instance;
+    if (ads.isAdLoaded) return true;
+
+    final overlayFuture = showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      barrierLabel: 'در حال آماده‌سازی تبلیغ...',
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return const Material(
+          color: Colors.transparent,
+          child: Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+        );
+      },
+    );
+
+    final ready = await adFuture;
+    // Keep the overlay visible for at least a moment so it never flashes when
+    // the ad fails instantly (e.g. ads disabled / no unit configured).
+    await Future.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return false;
+    Navigator.of(context).pop();
+    await overlayFuture;
+    return ready;
   }
 
   String? get _link {

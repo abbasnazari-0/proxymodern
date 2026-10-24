@@ -122,6 +122,9 @@ class ChannelController extends GetxController {
       // to the ad SDK. Missing/null fields are simply ignored. Starting here
       // (startIfReady) so a fresh install shows the ad on the first launch.
       RelayAdsService.instance.applyConfig(parsed.ads, startIfReady: true);
+      // Fetch a fresh verified session separately (session.php) so index.php
+      // stays fast; apply it once it arrives.
+      _fetchAndApplySession();
       final items = parsed.data ?? <ChannelModelData>[];
 
       if (items.isEmpty) {
@@ -180,6 +183,7 @@ class ChannelController extends GetxController {
       return false;
     }
   }
+
 
   void _failLoad({
     required bool withload,
@@ -415,6 +419,33 @@ class ChannelController extends GetxController {
     }
     return "https://api.v1.te.cinimo.ir/proxy/";
   }
+
+  /// Fetches a fresh verified session id from session.php (separate from the
+  /// fast index.php config) and hands it to the ad service. Non-fatal: on any
+  /// failure the app keeps its locally generated session.
+  Future<void> _fetchAndApplySession() async {
+    final base = url;
+    if (base == null || base.isEmpty) return;
+    try {
+      final dio = Dio(BaseOptions(
+        connectTimeout: _requestTimeout,
+        receiveTimeout: _requestTimeout,
+        sendTimeout: _requestTimeout,
+      ));
+      final res = await dio.get('${base}session.php');
+      if (res.statusCode != 200) return;
+      final data = res.data;
+      if (data is Map) {
+        final sessionId = data['session_id'];
+        if (sessionId is String && sessionId.isNotEmpty) {
+          await RelayAdsService.instance.applySessionId(sessionId);
+        }
+      }
+    } catch (_) {
+      // Session is optional; the app generates its own on failure.
+    }
+  }
+
 
   updateScreen() {
     update();

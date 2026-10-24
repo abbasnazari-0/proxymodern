@@ -85,6 +85,7 @@ class AdConfig {
   int? adMinIntervalSeconds;
   int? adMaxPerSession;
   int? adRetryCount;
+  int? stickyChangeCount;
   int? proxyTtlSeconds;
   int? timezoneOffsetMinutes;
   String? countryCode;
@@ -110,6 +111,7 @@ class AdConfig {
       this.adMinIntervalSeconds,
       this.adMaxPerSession,
       this.adRetryCount,
+      this.stickyChangeCount,
       this.proxyTtlSeconds,
       this.timezoneOffsetMinutes,
       this.countryCode,
@@ -145,6 +147,9 @@ class AdConfig {
     adRetryCount = json['ad_retry_count'] != null
         ? int.tryParse(json['ad_retry_count'].toString())
         : null;
+    stickyChangeCount = json['sticky_change_count'] != null
+        ? int.tryParse(json['sticky_change_count'].toString())
+        : null;
     proxyTtlSeconds = json['proxy_ttl_seconds'] != null
         ? int.tryParse(json['proxy_ttl_seconds'].toString())
         : null;
@@ -178,6 +183,7 @@ class AdConfig {
     data['ad_min_interval_seconds'] = adMinIntervalSeconds;
     data['ad_max_per_session'] = adMaxPerSession;
     data['ad_retry_count'] = adRetryCount;
+    data['sticky_change_count'] = stickyChangeCount;
     data['proxy_ttl_seconds'] = proxyTtlSeconds;
     data['timezone_offset_minutes'] = timezoneOffsetMinutes;
     data['country_code'] = countryCode;

@@ -57,49 +57,82 @@ class ProxyInfoSheet {
     );
   }
 
-  static Future<void> _copyLink(String link) async {
+  static Future<void> _copyLink(BuildContext context, String link) async {
     await Clipboard.setData(ClipboardData(text: link));
-    Get.snackbar(
-      "",
-      "",
-      backgroundColor: _card,
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 2),
-      titleText: Text(
-        "لینک کپی شد",
-        textAlign: TextAlign.center,
-        style: _text(size: 14, weight: FontWeight.w700),
-      ),
-      messageText: const SizedBox.shrink(),
-    );
+    if (!context.mounted) return;
+    _showSnack(context, "لینک کپی شد", null);
   }
 
-  static Future<void> _connect(String link) async {
+  static Future<void> _connect(BuildContext context, String link) async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
     final ok = await DataExtractor.launchUrl(link);
     if (ok) {
       Get.back();
       return;
     }
-    Get.snackbar(
-      "",
-      "",
-      backgroundColor: _card,
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 3),
-      titleText: Text(
-        "تلگرام باز نشد",
-        textAlign: TextAlign.center,
-        style: _text(size: 14, weight: FontWeight.w700),
-      ),
-      messageText: Text(
-        "دکمه کپی را بزن و لینک را در Saved Messages بفرست.",
-        textAlign: TextAlign.center,
-        style: _text(size: 12, color: _muted, height: 1.4),
-      ),
+    if (!context.mounted) return;
+    _showSnack(
+      context,
+      "تلگرام باز نشد",
+      "دکمه کپی را بزن و لینک را در Saved Messages بفرست.",
     );
+  }
+
+  /// Shows a bottom snackbar using the sheet's own context. GetX's snackbar
+  /// looks up its overlay through the global navigator context, which becomes
+  /// unusable right after an app-launch intent (e.g. trying to open Telegram)
+  /// and throws "Null check operator used on a null value". Using
+  /// ScaffoldMessenger avoids that crash.
+  static void _showSnack(BuildContext context, String title, String? message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger != null) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: _card,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: Duration(seconds: message == null ? 2 : 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: _text(size: 14, weight: FontWeight.w700),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: _text(size: 12, color: _muted, height: 1.4),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+    // Last resort: GetX snackbar, guarded so it can never crash the app.
+    try {
+      Get.snackbar(
+        title,
+        message ?? "",
+        backgroundColor: _card,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: message == null ? 2 : 3),
+      );
+    } catch (_) {
+      // Swallow — the action (copy / launch) already happened.
+    }
   }
 }
 class _ProxyInfoSheetBody extends StatelessWidget {
@@ -163,11 +196,11 @@ class _ProxyInfoSheetBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 _pingRow(),
                 const SizedBox(height: 18),
-                _connectButton(),
+                _connectButton(context),
                 const SizedBox(height: 8),
                 _shareButton(),
                 const SizedBox(height: 8),
-                Center(child: _copyButton()),
+                Center(child: _copyButton(context)),
               ],
             ),
           ),
@@ -252,7 +285,7 @@ class _ProxyInfoSheetBody extends StatelessWidget {
       ),
     );
   }
-  Widget _connectButton() {
+  Widget _connectButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -265,7 +298,7 @@ class _ProxyInfoSheetBody extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        onPressed: () => ProxyInfoSheet._connect(link),
+        onPressed: () => ProxyInfoSheet._connect(context, link),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -325,13 +358,13 @@ class _ProxyInfoSheetBody extends StatelessWidget {
     );
   }
 
-  Widget _copyButton() {
+  Widget _copyButton(BuildContext context) {
     return Material(
       color: ProxyInfoSheet._field,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => ProxyInfoSheet._copyLink(link),
+        onTap: () => ProxyInfoSheet._copyLink(context, link),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
