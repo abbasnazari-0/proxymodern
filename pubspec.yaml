@@ -37,7 +37,7 @@ dependencies:
   package_info_plus: ^4.2.0
   gap: ^3.0.1
 
-  relay_ads_flutter:
+  google_mobile_ads:
     path: C:/Users/HP/Desktop/empty/aaa/BaxVpn/relay_ads_flutter
   
 

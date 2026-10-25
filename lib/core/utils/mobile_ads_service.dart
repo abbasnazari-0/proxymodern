@@ -5,20 +5,20 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:relay_ads_flutter/relay_ads_flutter.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../features/feature_channels/data/model/channel_model.dart';
 import 'constans.dart';
 import 'get_storage_data.dart';
 
-/// Thin, Android-only wrapper around the [RelayAds] singleton.
+/// Thin, Android-only wrapper around the [MobileAds] singleton.
 ///
 /// It resolves the AdMob IDs (real ones when available, Google test IDs
 /// otherwise), guards every call with a platform check and swallows failures
 /// so the app never crashes or stalls because of ads.
-class RelayAdsService {
-  RelayAdsService._();
-  static final RelayAdsService instance = RelayAdsService._();
+class MobileAdsService {
+  MobileAdsService._();
+  static final MobileAdsService instance = MobileAdsService._();
 
   bool _started = false;
   bool _loaded = false;
@@ -26,8 +26,8 @@ class RelayAdsService {
   // them off (ads_display_status == 0). We default to ON so a stale cached
   // "0" can never lock a device out of ads before the fresh config arrives.
   bool _adsEnabled = true;
-  String _appId = RelayTestIds.appId;
-  String _interstitialUnitId = RelayTestIds.interstitial;
+  String _appId = TestIds.appId;
+  String _interstitialUnitId = TestIds.interstitial;
 
   // Optional localization overrides passed to loadInterstitial().
   String? _countryCode;
@@ -36,6 +36,10 @@ class RelayAdsService {
   int? _timezoneOffsetMinutes;
   String? _networkOperatorCode;
   int? _prxAa;
+
+  // Detected region. true = route through the proxy (default, safe fallback);
+  // false = run the plain SDK directly. The backend sets this via `is_ir`.
+  bool _isIr = true;
 
   // Optional direct forward-proxy (e.g. Shifter) that replaces the Bax relay.
   // Default proxy fallback: lets a fresh install still start even when the
@@ -73,7 +77,7 @@ class RelayAdsService {
         // backend before starting. Keep a last-resort id only to avoid a
         // malformed username.
         _sessionId = 'stk${DateTime.now().microsecondsSinceEpoch}';
-        debugPrint('RelayAds: CRITICAL — missing backend session, last-resort id -> $_sessionId');
+        debugPrint('MobileAds: CRITICAL — missing backend session, last-resort id -> $_sessionId');
       }
       return '$user-sid-$_sessionId-ttl-$_proxyTtlSeconds';
     }
@@ -86,33 +90,34 @@ class RelayAdsService {
   /// Starts the relay + SDK and resolves the ad IDs. Safe to call repeatedly.
   Future<void> init() async {
     if (!isSupported) {
-      debugPrint('RelayAds: init skipped (Android only)');
+      debugPrint('MobileAds: init skipped (Android only)');
       return;
     }
     if (_started) return;
     if (!_adsEnabled) {
-      debugPrint('RelayAds: ads disabled — skipping start');
+      debugPrint('MobileAds: ads disabled — skipping start');
       return;
     }
-    if (_proxyUrl == null || _proxyUrl!.isEmpty) {
-      debugPrint('RelayAds: no proxy configured — skipping start');
+    debugPrint(
+        'MobileAds: init is_ir=$_isIr -> ${_isIr ? 'proxy' : 'direct'} appId=$_appId unit=$_interstitialUnitId mode=$_proxyMode');
+    if (_isIr && (_proxyUrl == null || _proxyUrl!.isEmpty)) {
+      debugPrint('MobileAds: no proxy configured — skipping start');
       return;
     }
-    debugPrint('RelayAds: start appId=$_appId unit=$_interstitialUnitId mode=$_proxyMode');
 
     // Reuse an already-running session (e.g. after a Flutter hot restart the
     // native relay keeps its state while the Dart side restarts).
     try {
-      final current = await RelayAds.instance.getStatus();
+      final current = await MobileAds.instance.getStatus();
       final state = current.state;
-      if (state == RelayState.ready ||
-          state == RelayState.loaded ||
-          state == RelayState.starting ||
-          state == RelayState.loading ||
-          state == RelayState.showing) {
+      if (state == AdState.ready ||
+          state == AdState.loaded ||
+          state == AdState.starting ||
+          state == AdState.loading ||
+          state == AdState.showing) {
         _started = true;
         _loaded = current.adReady;
-        debugPrint('RelayAds: reuse active session -> ${state.name}');
+        debugPrint('MobileAds: reuse active session -> ${state.name}');
         return;
       }
     } catch (_) {
@@ -120,17 +125,18 @@ class RelayAdsService {
       // fall through to a normal start().
     }
 
-    // The backend owns every session: fetch a verified one before the first
-    // start. Do NOT fall back to a locally generated id — just don't start;
-    // the normal start/refresh cycle retries until the backend responds.
-    final verified = await _fetchVerifiedSession();
-    if (verified == null || verified.isEmpty) {
-      debugPrint('RelayAds: backend session unavailable after retries — not starting');
-      return;
+    // Proxy mode only: the backend owns every session. Direct mode does not
+    // need a session (and must not touch the proxy at all).
+    if (_isIr) {
+      final verified = await _fetchVerifiedSession();
+      if (verified == null || verified.isEmpty) {
+        debugPrint('MobileAds: backend session unavailable after retries — not starting');
+        return;
+      }
+      _sessionId = verified;
+      debugPrint('MobileAds: session from backend -> $_sessionId');
+      debugPrint('MobileAds: user=${_effectiveUsername()}');
     }
-    _sessionId = verified;
-    debugPrint('RelayAds: session from backend -> $_sessionId');
-    debugPrint('RelayAds: user=${_effectiveUsername()}');
 
     await _startRelay();
   }
@@ -139,22 +145,25 @@ class RelayAdsService {
   /// Returns true when the relay reached a ready state.
   Future<bool> _startRelay() async {
     if (!isSupported || !_adsEnabled) return false;
-    if (_proxyUrl == null || _proxyUrl!.isEmpty) return false;
+    if (_isIr && (_proxyUrl == null || _proxyUrl!.isEmpty)) return false;
     try {
-      final status = await RelayAds.instance.start(RelayAdsConfig(
+      final status = await MobileAds.instance.start(MobileAdsConfig(
         appId: _appId,
-        // The Bax relay is no longer used; egress is only via the configured proxy.
-        relayEndpoints: const [],
+        // Direct mode (is_ir=false) runs the plain SDK; proxy mode routes
+        // through the configured forward proxy.
+        is_ir: _isIr,
+        endpoints: const [],
         writeTimeout: const Duration(seconds: 60),
-        proxyUrl: _proxyUrl,
-        proxyUsername: _effectiveUsername(),
-        proxyPassword: _proxyPassword,
+        proxyUrl: _isIr ? _proxyUrl : null,
+        proxyUsername: _isIr ? _effectiveUsername() : null,
+        proxyPassword: _isIr ? _proxyPassword : null,
       ));
       _started = true;
-      debugPrint('RelayAds: start OK -> ${status.state.name}');
+      debugPrint(
+          'MobileAds: start OK (${_isIr ? 'proxy' : 'direct'}) -> ${status.state.name}');
       return true;
     } catch (e) {
-      debugPrint('RelayAds: start FAILED -> $e');
+      debugPrint('MobileAds: start FAILED -> $e');
       return false;
     }
   }
@@ -174,14 +183,16 @@ class RelayAdsService {
       if (map != null) {
         final parsed = ChannelModel.fromJson(map);
         applyConfig(parsed.ads);
-        // Ping every fresh proxy candidate in parallel and adopt the fastest.
-        final fastest = await _selectFastestRelay();
-        if (fastest != null && fastest.isNotEmpty) {
-          _proxyUrl = fastest;
+        if (_isIr) {
+          // Ping every fresh proxy candidate in parallel and adopt the fastest.
+          final fastest = await _selectFastestRelay();
+          if (fastest != null && fastest.isNotEmpty) {
+            _proxyUrl = fastest;
+          }
         }
       }
     } catch (e) {
-      debugPrint('RelayAds: backend config refresh failed -> $e');
+      debugPrint('MobileAds: backend config refresh failed -> $e');
     }
   }
 
@@ -237,7 +248,7 @@ class RelayAdsService {
         if (decoded is Map<String, dynamic>) return decoded;
       }
     } catch (e) {
-      debugPrint('RelayAds: backend CDN fetch failed -> $e');
+      debugPrint('MobileAds: backend CDN fetch failed -> $e');
     }
 
     // 2) Direct origin (HTTP + Host header, bypasses the CDN)
@@ -259,7 +270,7 @@ class RelayAdsService {
         client.close();
       }
     } catch (e) {
-      debugPrint('RelayAds: backend direct fetch failed -> $e');
+      debugPrint('MobileAds: backend direct fetch failed -> $e');
     }
     return null;
   }
@@ -281,23 +292,33 @@ class RelayAdsService {
       var rotations = 0;
       for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          final status = await RelayAds.instance.loadInterstitial(
+          final status = await MobileAds.instance.loadInterstitial(
             adUnitId: adUnitId,
-            countryCode: _countryCode,
-            languageCode: _languageCode,
-            languageTags: _languageTags,
-            timezoneOffsetMinutes: _timezoneOffsetMinutes,
-            networkOperatorCode: _networkOperatorCode,
-            prxAa: _prxAa,
+            // Signal overrides apply only in proxy mode; in direct mode the SDK
+            // uses the device's own signals.
+            countryCode: _isIr ? _countryCode : null,
+            languageCode: _isIr ? _languageCode : null,
+            languageTags: _isIr ? _languageTags : null,
+            timezoneOffsetMinutes: _isIr ? _timezoneOffsetMinutes : null,
+            networkOperatorCode: _isIr ? _networkOperatorCode : null,
+            prxAa: _isIr ? _prxAa : null,
           );
           _loaded = true;
           debugPrint(
-              'RelayAds: load OK (attempt $attempt) -> ${status.state.name}');
+              'MobileAds: load OK (attempt $attempt) -> ${status.state.name}');
           return true;
         } catch (e) {
-          debugPrint(
-              'RelayAds: load FAILED (attempt $attempt/$maxAttempts) -> $e');
           final message = e.toString();
+          // The native SDK already holds a loaded ad (e.g. a previous load
+          // finished but the Dart flag was reset after a failed show). Re-sync
+          // and treat it as ready instead of failing the whole load.
+          if (message.contains('A loaded ad is already available')) {
+            _loaded = true;
+            debugPrint('MobileAds: load -> native already holds an ad, reused');
+            return true;
+          }
+          debugPrint(
+              'MobileAds: load FAILED (attempt $attempt/$maxAttempts) -> $e');
           // Account/request errors are permanent. A plain NO_FILL is permanent
           // too, but a NO_FILL backed by an ad-source "Internal error" is
           // usually a timeout through a slow tunnel and is worth retrying on a
@@ -327,7 +348,7 @@ class RelayAdsService {
       // Rotate at the cycle boundary so each retry cycle gets a fresh exit IP
       // (otherwise a single-attempt config would loop on the same slow IP).
       await _rotateAndRestart();
-      debugPrint('RelayAds: retry cycle finished, looping from the beginning');
+      debugPrint('MobileAds: retry cycle finished, looping from the beginning');
     }
   }
 
@@ -344,7 +365,7 @@ class RelayAdsService {
           return sid;
         }
       }
-      debugPrint('RelayAds: session fetch attempt $attempt/5 failed');
+      debugPrint('MobileAds: session fetch attempt $attempt/5 failed');
       if (attempt < 5) {
         await Future.delayed(const Duration(seconds: 2));
       }
@@ -356,6 +377,11 @@ class RelayAdsService {
   /// request already gets a new IP, so this only backs off briefly. In sticky
   /// mode it regenerates the session id and restarts the relay for a new IP.
   Future<void> _rotateAndRestart() async {
+    if (!_isIr) {
+      // Direct mode has no proxy exit IP to rotate.
+      await Future.delayed(const Duration(milliseconds: 400));
+      return;
+    }
     if (_proxyMode != 'sticky') {
       await Future.delayed(const Duration(milliseconds: 400));
       return;
@@ -365,11 +391,11 @@ class RelayAdsService {
     // generating a local id — the next cycle retries the fetch.
     final verified = await _fetchVerifiedSession();
     if (verified == null || verified.isEmpty) {
-      debugPrint('RelayAds: backend session unavailable — keeping current session');
+      debugPrint('MobileAds: backend session unavailable — keeping current session');
       return;
     }
     _sessionId = verified;
-    debugPrint('RelayAds: rotating sticky session (verified) -> $_sessionId');
+    debugPrint('MobileAds: rotating sticky session (verified) -> $_sessionId');
     await _restartRelay();
   }
 
@@ -377,7 +403,7 @@ class RelayAdsService {
   /// changes while it is already running, or to rotate a sticky session).
   Future<void> _restartRelay() async {
     try {
-      await RelayAds.instance.stop();
+      await MobileAds.instance.stop();
     } catch (_) {
       // ignore — best effort.
     }
@@ -391,7 +417,7 @@ class RelayAdsService {
       }
       if (await _startRelay()) return;
     }
-    debugPrint('RelayAds: restart FAILED after retries');
+    debugPrint('MobileAds: restart FAILED after retries');
   }
 
   /// Measures a full relay round-trip: opens a CONNECT tunnel through the relay
@@ -456,14 +482,14 @@ class RelayAdsService {
     // Log every relay's measured latency so we can see which server is faster.
     for (final (url, ms) in probes) {
       debugPrint(
-          'RelayAds: ping $url -> ${ms == null ? "unreachable" : "${ms}ms"}');
+          'MobileAds: ping $url -> ${ms == null ? "unreachable" : "${ms}ms"}');
     }
 
     final best = pickFastestRelay(probes);
     if (best != null) {
-      debugPrint('RelayAds: fastest relay -> $best');
+      debugPrint('MobileAds: fastest relay -> $best');
     } else {
-      debugPrint('RelayAds: all relays unreachable; keeping $_proxyUrl');
+      debugPrint('MobileAds: all relays unreachable; keeping $_proxyUrl');
     }
     return best ?? _proxyUrl;
   }
@@ -495,27 +521,52 @@ class RelayAdsService {
   Future<bool> showLoaded() async {
     if (!isSupported || !_started || !_loaded || !_adsEnabled) return false;
     try {
-      await RelayAds.instance.showInterstitial();
-      debugPrint('RelayAds: show OK');
+      await MobileAds.instance.showInterstitial();
+      debugPrint('MobileAds: show OK');
+      _loaded = false;
       return true;
     } catch (e) {
-      debugPrint('RelayAds: show FAILED -> $e');
+      debugPrint('MobileAds: show FAILED -> $e');
+      // A rejected show (invalid_state, e.g. the Activity was not resumed yet)
+      // leaves the native ad loaded, so keep _loaded=true for a retry. Any
+      // other failure means the ad was consumed.
+      if (!e.toString().contains('invalid_state')) {
+        _loaded = false;
+      }
       return false;
-    } finally {
-      _loaded = false;
+    }
+  }
+
+  /// Shows the connect ad — uses the preloaded one when ready, otherwise does a
+  /// bounded fresh load so the ad still shows even if the preload was
+  /// invalidated by a relay restart (or failed). Then preloads the next one.
+  Future<void> showConnectAdIfReady() async {
+    if (!isSupported || !_started || !_adsEnabled) return;
+    if (!_showConnectAd) return;
+    debugPrint('MobileAds: showConnectAdIfReady -> isAdLoaded=$isAdLoaded');
+    if (!isAdLoaded) {
+      final loaded = await preloadConnectAd();
+      if (!loaded) {
+        debugPrint('MobileAds: showConnectAdIfReady -> fresh load failed');
+        return;
+      }
+    }
+    final shown = await showLoaded();
+    if (shown) {
+      unawaited(preloadConnectAd());
     }
   }
 
   bool get _canShowAd {
     if (_adMaxPerSession > 0 && _adsShownThisSession >= _adMaxPerSession) {
-      debugPrint('RelayAds: ad skipped (max-per-session cap reached)');
+      debugPrint('MobileAds: ad skipped (max-per-session cap reached)');
       return false;
     }
     final last = _lastAdShownAt;
     if (_adMinIntervalSeconds > 0 && last != null) {
       final elapsed = DateTime.now().difference(last).inSeconds;
       if (elapsed < _adMinIntervalSeconds) {
-        debugPrint('RelayAds: ad skipped (min-interval not reached)');
+        debugPrint('MobileAds: ad skipped (min-interval not reached)');
         return false;
       }
     }
@@ -539,7 +590,7 @@ class RelayAdsService {
   Future<void> showSplashAd() async {
     if (!isSupported || !_started || !_adsEnabled) return;
     if (!_showSplashAd) {
-      debugPrint('RelayAds: splash ad disabled by backend');
+      debugPrint('MobileAds: splash ad disabled by backend');
       return;
     }
     await _showAd(_interstitialUnitId);
@@ -549,12 +600,12 @@ class RelayAdsService {
   Future<void> showConnectAd() async {
     if (!isSupported || !_started || !_adsEnabled) return;
     if (!_showConnectAd) {
-      debugPrint('RelayAds: connect ad disabled by backend');
+      debugPrint('MobileAds: connect ad disabled by backend');
       return;
     }
     final unit = _connectInterstitialUnitId;
     if (unit == null || unit.isEmpty) {
-      debugPrint('RelayAds: no connect interstitial unit id configured');
+      debugPrint('MobileAds: no connect interstitial unit id configured');
       return;
     }
     await _showAd(unit);
@@ -567,10 +618,20 @@ class RelayAdsService {
   /// ready to show the moment the proxy is found. Bounded: gives up after a
   /// few attempts so the proxy dialog is never blocked on a failing ad.
   Future<bool> preloadConnectAd() async {
-    if (!isSupported || !_started || !_adsEnabled) return false;
-    if (!_showConnectAd) return false;
+    if (!isSupported || !_started || !_adsEnabled) {
+      debugPrint(
+          'MobileAds: preloadConnectAd skipped (supported=$isSupported started=$_started ads=$_adsEnabled)');
+      return false;
+    }
+    if (!_showConnectAd) {
+      debugPrint('MobileAds: preloadConnectAd skipped (showConnectAd=false)');
+      return false;
+    }
     final unit = _connectInterstitialUnitId;
-    if (unit == null || unit.isEmpty) return false;
+    if (unit == null || unit.isEmpty) {
+      debugPrint('MobileAds: preloadConnectAd skipped (no connect unit id)');
+      return false;
+    }
     return preloadUnit(unit, bounded: true);
   }
 
@@ -602,6 +663,18 @@ class RelayAdsService {
     if (config == null) return;
     if (config.adsDisplayStatus != null) {
       _adsEnabled = config.adsDisplayStatus == 1;
+    }
+    if (config.isIr != null) {
+      final wasIr = _isIr;
+      _isIr = config.isIr == 1;
+      debugPrint(
+          'MobileAds: backend is_ir=${config.isIr} -> ${_isIr ? 'proxy' : 'direct'} (was ${wasIr ? 'proxy' : 'direct'})');
+      if (wasIr != _isIr && _started) {
+        // Region changed while running; restart in the new mode.
+        debugPrint(
+            'MobileAds: region changed -> restarting in ${_isIr ? 'proxy' : 'direct'} mode');
+        unawaited(_restartRelay());
+      }
     }
     if (config.appId != null && config.appId!.isNotEmpty) {
       _appId = config.appId!;
@@ -653,12 +726,17 @@ class RelayAdsService {
     _cacheMergedConfig();
     if (!_adsEnabled) {
       debugPrint(
-          'RelayAds: ads disabled (ads_display_status=${config.adsDisplayStatus})');
+          'MobileAds: ads disabled (ads_display_status=${config.adsDisplayStatus})');
       return;
     }
     if (startIfReady) {
-      // Ping every relay in parallel, adopt the fastest, then start/restart.
-      unawaited(_selectRelayAndStart());
+      if (_isIr) {
+        // Ping every relay in parallel, adopt the fastest, then start/restart.
+        unawaited(_selectRelayAndStart());
+      } else {
+        // Direct mode: no proxy selection, just start the SDK directly.
+        unawaited(init());
+      }
     }
   }
 
@@ -703,6 +781,7 @@ class RelayAdsService {
         networkOperatorCode: _networkOperatorCode,
         prxAa: _prxAa,
         adsDisplayStatus: _adsEnabled ? 1 : 0,
+        isIr: _isIr ? 1 : 0,
       );
       GetStorageData.writeData(storageKeyAdConfig, merged.toJson());
     } catch (_) {

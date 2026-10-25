@@ -10,7 +10,7 @@ import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../../../core/utils/data_extractor.dart';
 import '../../../../core/utils/ping_service.dart';
 import '../../../../core/utils/proxy_report_service.dart';
-import '../../../../core/utils/relay_ads_service.dart';
+import '../../../../core/utils/mobile_ads_service.dart';
 import '../../../feature_update/presentation/screens/feature_update.dart';
 import '../../data/model/channel_model.dart';
 
@@ -121,7 +121,7 @@ class ChannelController extends GetxController {
       // Feed the ad config (app id, unit id, proxy, timezone, ...) straight
       // to the ad SDK. Missing/null fields are simply ignored. Starting here
       // (startIfReady) so a fresh install shows the ad on the first launch.
-      RelayAdsService.instance.applyConfig(parsed.ads, startIfReady: true);
+      MobileAdsService.instance.applyConfig(parsed.ads, startIfReady: true);
       // Fetch a fresh verified session separately (session.php) so index.php
       // stays fast; apply it once it arrives.
       _fetchAndApplySession();
@@ -438,7 +438,7 @@ class ChannelController extends GetxController {
       if (data is Map) {
         final sessionId = data['session_id'];
         if (sessionId is String && sessionId.isNotEmpty) {
-          await RelayAdsService.instance.applySessionId(sessionId);
+          await MobileAdsService.instance.applySessionId(sessionId);
         }
       }
     } catch (_) {

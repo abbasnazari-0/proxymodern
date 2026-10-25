@@ -7,7 +7,6 @@ class MainWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('ddd');
     return GetMaterialApp(
       title: 'Pro Telegram Proxy',
       theme: ThemeData(),

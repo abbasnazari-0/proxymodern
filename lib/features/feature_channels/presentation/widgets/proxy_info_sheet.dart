@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/mobile_ads_service.dart';
 
 /// A detail bottom sheet shown when the user taps a proxy in the list.
 ///
@@ -65,6 +66,8 @@ class ProxyInfoSheet {
 
   static Future<void> _connect(BuildContext context, String link) async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
+    // Show the preloaded connect ad (if ready) before opening Telegram.
+    await MobileAdsService.instance.showConnectAdIfReady();
     final ok = await DataExtractor.launchUrl(link);
     if (ok) {
       Get.back();

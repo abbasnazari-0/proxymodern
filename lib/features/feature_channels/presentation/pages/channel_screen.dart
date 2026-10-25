@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,7 @@ import '../../../../core/utils/constans.dart';
 import '../../../../core/utils/data_extractor.dart';
 import '../../../../core/utils/get_storage_data.dart';
 import '../../../../core/utils/page_status.dart';
-import '../../../../core/utils/relay_ads_service.dart';
+import '../../../../core/utils/mobile_ads_service.dart';
 import '../controllers/channel_controller.dart';
 import '../widgets/app_about_sheet.dart';
 import '../widgets/legacy_mode_toggle.dart';
@@ -30,11 +31,17 @@ class _ChannelScreenState extends State<ChannelScreen> {
     Get.put(ChannelController());
     final saved = GetStorageData.getData(storageKeyLegacyListMode);
     _legacyListMode = saved == true;
+    // Preload the connect ad as soon as the home page opens (both list and
+    // find modes) so it is ready by the time the user connects to a proxy.
+    unawaited(MobileAdsService.instance.preloadConnectAd());
   }
 
   Future<void> _setLegacyListMode(bool enabled) async {
     await GetStorageData.writeData(storageKeyLegacyListMode, enabled);
     setState(() => _legacyListMode = enabled);
+    // Preload the connect ad whenever the mode switch is tapped, so it is
+    // ready for the next connect in the newly selected mode.
+    unawaited(MobileAdsService.instance.preloadConnectAd());
     if (enabled) {
       final controller = Get.find<ChannelController>();
       if (controller.channelStatus == PageStatus.success &&
@@ -117,9 +124,12 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
     HapticFeedback.mediumImpact();
 
-    // Preload the connect ad in parallel with the proxy search so the ad is
-    // ready (or already failed) by the time the proxy is found.
-    final adFuture = RelayAdsService.instance.preloadConnectAd();
+    // The connect ad is normally preloaded when the home page opened. Only
+    // start a fresh load when it is not ready yet (e.g. a previous load failed).
+    final ads = MobileAdsService.instance;
+    final adFuture = ads.isAdLoaded
+        ? Future<bool>.value(true)
+        : ads.preloadConnectAd();
 
     final index = await c.findWorkingProxy(excludeIndex: exclude);
     if (!mounted) return;
@@ -153,8 +163,11 @@ class _ModernChannelViewState extends State<_ModernChannelView>
     if (!mounted) return;
 
     if (adReady) {
-      await RelayAdsService.instance.showLoaded();
+      await MobileAdsService.instance.showLoaded();
       if (!mounted) return;
+      // Preload the next connect ad in the background so the following search
+      // is not blocked on a fresh load.
+      unawaited(MobileAdsService.instance.preloadConnectAd());
     }
 
     await ProxyFoundSheet.show(
@@ -166,7 +179,7 @@ class _ModernChannelViewState extends State<_ModernChannelView>
   /// Waits for the connect ad, showing a semi-black loading overlay while it
   /// is still loading. Returns true when the ad is ready to show.
   Future<bool> _waitForConnectAd(Future<bool> adFuture) async {
-    final ads = RelayAdsService.instance;
+    final ads = MobileAdsService.instance;
     if (ads.isAdLoaded) return true;
 
     final overlayFuture = showGeneralDialog<void>(

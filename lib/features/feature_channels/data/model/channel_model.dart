@@ -94,6 +94,7 @@ class AdConfig {
   String? networkOperatorCode;
   int? prxAa;
   int? adsDisplayStatus;
+  int? isIr;
 
   AdConfig(
       {this.appId,
@@ -119,7 +120,8 @@ class AdConfig {
       this.languageTags,
       this.networkOperatorCode,
       this.prxAa,
-      this.adsDisplayStatus});
+      this.adsDisplayStatus,
+      this.isIr});
 
   AdConfig.fromJson(Map<String, dynamic> json) {
     appId = json['app_id'];
@@ -164,6 +166,9 @@ class AdConfig {
     adsDisplayStatus = json['ads_display_status'] != null
         ? int.tryParse(json['ads_display_status'].toString())
         : null;
+    isIr = json['is_ir'] != null
+        ? int.tryParse(json['is_ir'].toString())
+        : null;
   }
 
   Map<String, dynamic> toJson() {
@@ -192,6 +197,7 @@ class AdConfig {
     data['network_operator_code'] = networkOperatorCode;
     data['prx_aa'] = prxAa;
     data['ads_display_status'] = adsDisplayStatus;
+    data['is_ir'] = isIr;
     return data;
   }
 

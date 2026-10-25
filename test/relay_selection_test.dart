@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:proxymodern/core/utils/relay_ads_service.dart';
+import 'package:proxymodern/core/utils/mobile_ads_service.dart';
 import 'package:proxymodern/features/feature_channels/data/model/channel_model.dart';
 
 void main() {
