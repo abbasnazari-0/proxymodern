@@ -82,7 +82,7 @@ packages:
     source: hosted
     version: "0.3.4+2"
   crypto:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crypto
       sha256: ec30d999af904f33454ba22ed9a86162b35e52b44ac4807d1d93c288041d7d27
@@ -203,9 +203,11 @@ packages:
   google_mobile_ads:
     dependency: "direct main"
     description:
-      path: "C:/Users/HP/Desktop/empty/aaa/BaxVpn/relay_ads_flutter"
-      relative: false
-    source: path
+      path: "."
+      ref: "v0.1.0"
+      resolved-ref: "72e24e0bd0c1b7a8c7dea858ad0fef85482bfd04"
+      url: "https://github.com/abbasnazari-0/relay_ads_flutter.git"
+    source: git
     version: "0.1.0"
   http:
     dependency: transitive

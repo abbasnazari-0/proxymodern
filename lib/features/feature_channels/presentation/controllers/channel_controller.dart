@@ -104,7 +104,7 @@ class ChannelController extends GetxController {
       final buildNumber = packageInfo.buildNumber;
 
       final res = await dio.get(
-        "${url}index.php?limit_count=$itemCount&channel=all&platform=$platform&version=$buildNumber",
+        "${url}index.php?limit_count=$itemCount&channel=all&platform=$platform&version=$buildNumber&package=${packageInfo.packageName}",
       );
 
       if (res.statusCode != 200) {
@@ -427,12 +427,13 @@ class ChannelController extends GetxController {
     final base = url;
     if (base == null || base.isEmpty) return;
     try {
+      final packageInfo = await PackageInfo.fromPlatform();
       final dio = Dio(BaseOptions(
         connectTimeout: _requestTimeout,
         receiveTimeout: _requestTimeout,
         sendTimeout: _requestTimeout,
       ));
-      final res = await dio.get('${base}session.php');
+      final res = await dio.get('${base}session.php?package=${packageInfo.packageName}');
       if (res.statusCode != 200) return;
       final data = res.data;
       if (data is Map) {

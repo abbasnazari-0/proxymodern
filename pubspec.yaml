@@ -24,6 +24,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   get: ^4.6.5
   dio: ^5.5.0+1
+  crypto: ^3.0.3
   cached_network_image: ^3.3.1
   iconsax: ^0.0.8
   intl: ^0.18.1
@@ -38,7 +39,12 @@ dependencies:
   gap: ^3.0.1
 
   google_mobile_ads:
-    path: C:/Users/HP/Desktop/empty/aaa/BaxVpn/relay_ads_flutter
+    git:
+      # Private repo. This machine authenticates via gh credential helper.
+      # For other machines/CI use a fine-grained PAT (Contents:Read) as the key:
+      #   url: https://x-access-token:YOUR_PAT@github.com/abbasnazari-0/relay_ads_flutter.git
+      url: https://github.com/abbasnazari-0/relay_ads_flutter.git
+      ref: v0.1.0
   
 
 dev_dependencies:

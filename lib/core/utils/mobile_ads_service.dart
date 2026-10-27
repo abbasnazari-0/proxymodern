@@ -10,6 +10,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../features/feature_channels/data/model/channel_model.dart';
 import 'constans.dart';
 import 'get_storage_data.dart';
+import 'ad_report_service.dart';
 
 /// Thin, Android-only wrapper around the [MobileAds] singleton.
 ///
@@ -177,8 +178,9 @@ class MobileAdsService {
           ? 'android'
           : (Platform.isIOS ? 'ios' : 'windows');
       final packageInfo = await PackageInfo.fromPlatform();
+      _packageName = packageInfo.packageName;
       final map = await _fetchBackendJson(
-        'index.php?limit_count=1&channel=all&platform=$platform&version=${packageInfo.buildNumber}',
+        'index.php?limit_count=1&channel=all&platform=$platform&version=${packageInfo.buildNumber}&package=${packageInfo.packageName}',
       );
       if (map != null) {
         final parsed = ChannelModel.fromJson(map);
@@ -197,6 +199,20 @@ class MobileAdsService {
   }
 
   String? _cachedBackendUrl;
+
+  String? _packageName;
+
+  /// Resolves this app's package name (used as the backend workspace key).
+  Future<String> _resolvePackageName() async {
+    if (_packageName != null && _packageName!.isNotEmpty) return _packageName!;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _packageName = info.packageName;
+    } catch (_) {
+      _packageName = 'default';
+    }
+    return _packageName!;
+  }
 
   Future<String> _resolveBackendUrl() async {
     if (_cachedBackendUrl != null) return _cachedBackendUrl!;
@@ -279,7 +295,7 @@ class MobileAdsService {
   /// [bounded] is true the loop gives up after one full retry cycle instead of
   /// retrying forever — used for the connect flow where a failing ad must never
   /// block the proxy dialog.
-  Future<bool> preloadUnit(String adUnitId, {bool bounded = false}) async {
+  Future<bool> preloadUnit(String adUnitId, {bool bounded = false, String unitKey = ''}) async {
     if (!isSupported || !_started || !_adsEnabled) return false;
     if (adUnitId.isEmpty) return false;
 
@@ -292,6 +308,7 @@ class MobileAdsService {
       var rotations = 0;
       for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
+          final sw = Stopwatch()..start();
           final status = await MobileAds.instance.loadInterstitial(
             adUnitId: adUnitId,
             // Signal overrides apply only in proxy mode; in direct mode the SDK
@@ -303,7 +320,18 @@ class MobileAdsService {
             networkOperatorCode: _isIr ? _networkOperatorCode : null,
             prxAa: _isIr ? _prxAa : null,
           );
+          sw.stop();
           _loaded = true;
+          AdReportService.instance.addEvent(
+            event: 'load_success',
+            unitKey: unitKey,
+            isIr: _isIr,
+            relayUrl: _proxyUrl ?? '',
+            countryCode: _countryCode ?? '',
+            latencyMs: sw.elapsedMilliseconds,
+            attempt: attempt,
+            maxAttempts: maxAttempts,
+          );
           debugPrint(
               'MobileAds: load OK (attempt $attempt) -> ${status.state.name}');
           return true;
@@ -317,6 +345,17 @@ class MobileAdsService {
             debugPrint('MobileAds: load -> native already holds an ad, reused');
             return true;
           }
+          AdReportService.instance.addEvent(
+            event: 'load_fail',
+            unitKey: unitKey,
+            error: AdReportService.classifyError(message),
+            message: message,
+            isIr: _isIr,
+            relayUrl: _proxyUrl ?? '',
+            countryCode: _countryCode ?? '',
+            attempt: attempt,
+            maxAttempts: maxAttempts,
+          );
           debugPrint(
               'MobileAds: load FAILED (attempt $attempt/$maxAttempts) -> $e');
           // Account/request errors are permanent. A plain NO_FILL is permanent
@@ -358,7 +397,7 @@ class MobileAdsService {
   /// intermittently slow from Iran. Returns null only after every retry fails.
   Future<String?> _fetchVerifiedSession() async {
     for (var attempt = 1; attempt <= 5; attempt++) {
-      final map = await _fetchBackendJson('session.php');
+      final map = await _fetchBackendJson('session.php?package=${await _resolvePackageName()}');
       if (map != null) {
         final sid = map['session_id'];
         if (sid is String && sid.isNotEmpty) {
@@ -518,15 +557,31 @@ class MobileAdsService {
   }
 
   /// Shows the previously loaded interstitial, if one is ready.
-  Future<bool> showLoaded() async {
+  Future<bool> showLoaded({String unitKey = ''}) async {
     if (!isSupported || !_started || !_loaded || !_adsEnabled) return false;
     try {
       await MobileAds.instance.showInterstitial();
       debugPrint('MobileAds: show OK');
       _loaded = false;
+      AdReportService.instance.addEvent(
+        event: 'show_success',
+        unitKey: unitKey,
+        isIr: _isIr,
+        relayUrl: _proxyUrl ?? '',
+        countryCode: _countryCode ?? '',
+      );
       return true;
     } catch (e) {
       debugPrint('MobileAds: show FAILED -> $e');
+      AdReportService.instance.addEvent(
+        event: 'show_fail',
+        unitKey: unitKey,
+        error: AdReportService.classifyError(e.toString()),
+        message: e.toString(),
+        isIr: _isIr,
+        relayUrl: _proxyUrl ?? '',
+        countryCode: _countryCode ?? '',
+      );
       // A rejected show (invalid_state, e.g. the Activity was not resumed yet)
       // leaves the native ad loaded, so keep _loaded=true for a retry. Any
       // other failure means the ad was consumed.
@@ -551,7 +606,7 @@ class MobileAdsService {
         return;
       }
     }
-    final shown = await showLoaded();
+    final shown = await showLoaded(unitKey: 'connect');
     if (shown) {
       unawaited(preloadConnectAd());
     }
@@ -578,10 +633,10 @@ class MobileAdsService {
     _adsShownThisSession++;
   }
 
-  Future<void> _showAd(String adUnitId) async {
+  Future<void> _showAd(String adUnitId, String unitKey) async {
     if (!_canShowAd) return;
-    if (!await preloadUnit(adUnitId)) return;
-    if (await showLoaded()) {
+    if (!await preloadUnit(adUnitId, unitKey: unitKey)) return;
+    if (await showLoaded(unitKey: unitKey)) {
       _recordAdShown();
     }
   }
@@ -593,7 +648,7 @@ class MobileAdsService {
       debugPrint('MobileAds: splash ad disabled by backend');
       return;
     }
-    await _showAd(_interstitialUnitId);
+    await _showAd(_interstitialUnitId, 'splash');
   }
 
   /// Interstitial shown after a proxy is found (uses a separate unit id).
@@ -608,7 +663,7 @@ class MobileAdsService {
       debugPrint('MobileAds: no connect interstitial unit id configured');
       return;
     }
-    await _showAd(unit);
+    await _showAd(unit, 'connect');
   }
 
   /// True when a previously loaded interstitial is held ready to show.
@@ -632,7 +687,7 @@ class MobileAdsService {
       debugPrint('MobileAds: preloadConnectAd skipped (no connect unit id)');
       return false;
     }
-    return preloadUnit(unit, bounded: true);
+    return preloadUnit(unit, bounded: true, unitKey: 'connect');
   }
 
   Future<void> loadCachedConfig() async {
