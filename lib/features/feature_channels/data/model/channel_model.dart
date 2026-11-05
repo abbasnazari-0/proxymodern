@@ -3,20 +3,14 @@ class ChannelModel {
   String? message;
   List<ChannelModelData>? data;
   Setting? setting;
-  AdConfig? ads;
 
-  ChannelModel(
-      {this.result, this.message, this.data, this.setting, this.ads});
+  ChannelModel({this.result, this.message, this.data, this.setting});
 
   ChannelModel.fromJson(Map<String, dynamic> json) {
     result = json['result'];
     message = json['message'];
     setting =
         json['setting'] != null ? Setting.fromJson(json['setting']) : null;
-    // The backend currently merges the ad config into "setting"; also support
-    // a dedicated "ads" object if it moves there later.
-    final adsJson = json['ads'] ?? json['setting'];
-    ads = adsJson != null ? AdConfig.fromJson(adsJson) : null;
     if (json['data'] != null) {
       data = <ChannelModelData>[];
       json['data'].forEach((v) {
@@ -66,148 +60,6 @@ class Setting {
     data['update_url'] = udateUrl;
     data['should_update'] = shouldUpdate;
     return data;
-  }
-}
-
-class AdConfig {
-  String? appId;
-  String? interstitialUnitId;
-  String? proxyUrl;
-  String? proxyUrl2;
-  String? proxyUrl3;
-  String? proxyUsername;
-  String? proxyPassword;
-  String? proxyMode;
-  String? proxySessionId;
-  int? showSplashAd;
-  int? showConnectAd;
-  String? connectInterstitialUnitId;
-  int? adMinIntervalSeconds;
-  int? adMaxPerSession;
-  int? adRetryCount;
-  int? stickyChangeCount;
-  int? proxyTtlSeconds;
-  int? timezoneOffsetMinutes;
-  String? countryCode;
-  String? languageCode;
-  List<String>? languageTags;
-  String? networkOperatorCode;
-  int? prxAa;
-  int? adsDisplayStatus;
-  int? isIr;
-
-  AdConfig(
-      {this.appId,
-      this.interstitialUnitId,
-      this.proxyUrl,
-      this.proxyUrl2,
-      this.proxyUrl3,
-      this.proxyUsername,
-      this.proxyPassword,
-      this.proxyMode,
-      this.proxySessionId,
-      this.showSplashAd,
-      this.showConnectAd,
-      this.connectInterstitialUnitId,
-      this.adMinIntervalSeconds,
-      this.adMaxPerSession,
-      this.adRetryCount,
-      this.stickyChangeCount,
-      this.proxyTtlSeconds,
-      this.timezoneOffsetMinutes,
-      this.countryCode,
-      this.languageCode,
-      this.languageTags,
-      this.networkOperatorCode,
-      this.prxAa,
-      this.adsDisplayStatus,
-      this.isIr});
-
-  AdConfig.fromJson(Map<String, dynamic> json) {
-    appId = json['app_id'];
-    interstitialUnitId = json['interstitial_unit_id'];
-    proxyUrl = json['proxy_url'];
-    proxyUrl2 = json['proxy_url_2'];
-    proxyUrl3 = json['proxy_url_3'];
-    proxyUsername = json['proxy_username'];
-    proxyPassword = json['proxy_password'];
-    proxyMode = json['proxy_mode'];
-    proxySessionId = json['proxy_session_id'];
-    showSplashAd = json['show_splash_ad'] != null
-        ? int.tryParse(json['show_splash_ad'].toString())
-        : null;
-    showConnectAd = json['show_connect_ad'] != null
-        ? int.tryParse(json['show_connect_ad'].toString())
-        : null;
-    connectInterstitialUnitId = json['connect_interstitial_unit_id'];
-    adMinIntervalSeconds = json['ad_min_interval_seconds'] != null
-        ? int.tryParse(json['ad_min_interval_seconds'].toString())
-        : null;
-    adMaxPerSession = json['ad_max_per_session'] != null
-        ? int.tryParse(json['ad_max_per_session'].toString())
-        : null;
-    adRetryCount = json['ad_retry_count'] != null
-        ? int.tryParse(json['ad_retry_count'].toString())
-        : null;
-    stickyChangeCount = json['sticky_change_count'] != null
-        ? int.tryParse(json['sticky_change_count'].toString())
-        : null;
-    proxyTtlSeconds = json['proxy_ttl_seconds'] != null
-        ? int.tryParse(json['proxy_ttl_seconds'].toString())
-        : null;
-    timezoneOffsetMinutes = json['timezone_offset_minutes'];
-    countryCode = json['country_code'];
-    languageCode = json['language_code'];
-    if (json['language_tags'] != null) {
-      languageTags = List<String>.from(json['language_tags']);
-    }
-    networkOperatorCode = json['network_operator_code'];
-    prxAa = json['prx_aa'];
-    adsDisplayStatus = json['ads_display_status'] != null
-        ? int.tryParse(json['ads_display_status'].toString())
-        : null;
-    isIr = json['is_ir'] != null
-        ? int.tryParse(json['is_ir'].toString())
-        : null;
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['app_id'] = appId;
-    data['interstitial_unit_id'] = interstitialUnitId;
-    data['proxy_url'] = proxyUrl;
-    data['proxy_url_2'] = proxyUrl2;
-    data['proxy_url_3'] = proxyUrl3;
-    data['proxy_username'] = proxyUsername;
-    data['proxy_password'] = proxyPassword;
-    data['proxy_mode'] = proxyMode;
-    data['proxy_session_id'] = proxySessionId;
-    data['show_splash_ad'] = showSplashAd;
-    data['show_connect_ad'] = showConnectAd;
-    data['connect_interstitial_unit_id'] = connectInterstitialUnitId;
-    data['ad_min_interval_seconds'] = adMinIntervalSeconds;
-    data['ad_max_per_session'] = adMaxPerSession;
-    data['ad_retry_count'] = adRetryCount;
-    data['sticky_change_count'] = stickyChangeCount;
-    data['proxy_ttl_seconds'] = proxyTtlSeconds;
-    data['timezone_offset_minutes'] = timezoneOffsetMinutes;
-    data['country_code'] = countryCode;
-    data['language_code'] = languageCode;
-    data['language_tags'] = languageTags;
-    data['network_operator_code'] = networkOperatorCode;
-    data['prx_aa'] = prxAa;
-    data['ads_display_status'] = adsDisplayStatus;
-    data['is_ir'] = isIr;
-    return data;
-  }
-
-  /// All configured relay URLs (primary + backups), empty entries filtered out.
-  List<String> get proxyCandidates {
-    return <String>[
-      if (proxyUrl != null && proxyUrl!.isNotEmpty) proxyUrl!,
-      if (proxyUrl2 != null && proxyUrl2!.isNotEmpty) proxyUrl2!,
-      if (proxyUrl3 != null && proxyUrl3!.isNotEmpty) proxyUrl3!,
-    ];
   }
 }
 

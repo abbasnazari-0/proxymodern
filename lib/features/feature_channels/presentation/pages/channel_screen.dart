@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,7 +7,6 @@ import '../../../../core/utils/constans.dart';
 import '../../../../core/utils/data_extractor.dart';
 import '../../../../core/utils/get_storage_data.dart';
 import '../../../../core/utils/page_status.dart';
-import '../../../../core/utils/mobile_ads_service.dart';
 import '../controllers/channel_controller.dart';
 import '../widgets/app_about_sheet.dart';
 import '../widgets/legacy_mode_toggle.dart';
@@ -31,17 +29,11 @@ class _ChannelScreenState extends State<ChannelScreen> {
     Get.put(ChannelController());
     final saved = GetStorageData.getData(storageKeyLegacyListMode);
     _legacyListMode = saved == true;
-    // Preload the connect ad as soon as the home page opens (both list and
-    // find modes) so it is ready by the time the user connects to a proxy.
-    unawaited(MobileAdsService.instance.preloadConnectAd());
   }
 
   Future<void> _setLegacyListMode(bool enabled) async {
     await GetStorageData.writeData(storageKeyLegacyListMode, enabled);
     setState(() => _legacyListMode = enabled);
-    // Preload the connect ad whenever the mode switch is tapped, so it is
-    // ready for the next connect in the newly selected mode.
-    unawaited(MobileAdsService.instance.preloadConnectAd());
     if (enabled) {
       final controller = Get.find<ChannelController>();
       if (controller.channelStatus == PageStatus.success &&
@@ -124,13 +116,6 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
     HapticFeedback.mediumImpact();
 
-    // The connect ad is normally preloaded when the home page opened. Only
-    // start a fresh load when it is not ready yet (e.g. a previous load failed).
-    final ads = MobileAdsService.instance;
-    final adFuture = ads.isAdLoaded
-        ? Future<bool>.value(true)
-        : ads.preloadConnectAd();
-
     final index = await c.findWorkingProxy(excludeIndex: exclude);
     if (!mounted) return;
 
@@ -157,55 +142,10 @@ class _ModernChannelViewState extends State<_ModernChannelView>
         ? item!.title!.trim()
         : "پروکسی آماده اتصال است";
 
-    // Wait for the ad (semi-black loading overlay while it is still loading).
-    // If the ad failed, fall through and show the proxy dialog anyway.
-    final adReady = await _waitForConnectAd(adFuture);
-    if (!mounted) return;
-
-    if (adReady) {
-      await MobileAdsService.instance.showLoaded();
-      if (!mounted) return;
-      // Preload the next connect ad in the background so the following search
-      // is not blocked on a fresh load.
-      unawaited(MobileAdsService.instance.preloadConnectAd());
-    }
-
     await ProxyFoundSheet.show(
       link: link,
       caption: caption,
     );
-  }
-
-  /// Waits for the connect ad, showing a semi-black loading overlay while it
-  /// is still loading. Returns true when the ad is ready to show.
-  Future<bool> _waitForConnectAd(Future<bool> adFuture) async {
-    final ads = MobileAdsService.instance;
-    if (ads.isAdLoaded) return true;
-
-    final overlayFuture = showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black54,
-      barrierLabel: 'در حال آماده‌سازی تبلیغ...',
-      transitionDuration: const Duration(milliseconds: 150),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return const Material(
-          color: Colors.transparent,
-          child: Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          ),
-        );
-      },
-    );
-
-    final ready = await adFuture;
-    // Keep the overlay visible for at least a moment so it never flashes when
-    // the ad fails instantly (e.g. ads disabled / no unit configured).
-    await Future.delayed(const Duration(milliseconds: 250));
-    if (!mounted) return false;
-    Navigator.of(context).pop();
-    await overlayFuture;
-    return ready;
   }
 
   String? get _link {

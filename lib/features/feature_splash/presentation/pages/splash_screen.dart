@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'package:proxymodern/core/utils/mobile_ads_service.dart';
 import 'package:proxymodern/features/feature_channels/presentation/pages/channel_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -55,17 +54,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _boot() async {
     final minDelay = Future.delayed(const Duration(seconds: 2));
-    final ads = MobileAdsService.instance;
-
-    // Use the cached backend ad config from the last launch (if any).
-    await ads.loadCachedConfig();
-    // Fetch a FRESH backend config so the splash ad uses a fresh, pre-warmed
-    // sticky session instead of a stale cached one (which times out).
-    await ads.refreshConfigFromBackend();
-    await ads.init();
-    // Small delay so the Android Activity is fully resumed before the ad.
-    await Future.delayed(const Duration(milliseconds: 600));
-    await ads.showSplashAd();
 
     await minDelay;
     if (mounted) {

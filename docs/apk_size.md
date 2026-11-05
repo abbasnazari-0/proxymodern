@@ -32,15 +32,13 @@ Measured from the fat APK that was sitting in `build/` (51.89 MiB):
 | `lib/armeabi-v7a/libapp.so`                  | 5.83 MiB    |
 | `lib/arm64-v8a/libapp.so`                    | 5.25 MiB    |
 | `lib/x86_64/libapp.so`                       | 5.44 MiB    |
-| `classes.dex` (ads SDK + okhttp + protobuf)  | 4.32 MiB    |
+| `classes.dex`                                 | 4.32 MiB    |
 | `assets/**` (iconsax font, lotties, vazir)   | ~2.5 MiB    |
 | everything else                              | ~1 MiB      |
 | **total**                                    | **51.89 MiB** |
 
-> That artifact predates `relay_ads_flutter` (it contains no `dev.relayads`
-> classes), so a fresh default build is a few tenths of a MiB larger. The
-> proportions are unchanged, and `proxy-test.apk` in `build/` is stale — do not
-> ship it.
+> The numbers above come from an older build; treat the absolute sizes as
+> approximate. `proxy-test.apk` in `build/` is stale — do not ship it.
 
 Two things follow from that table:
 
@@ -93,18 +91,17 @@ most users actually pay for. To make it the permanent default, flip
 `isMinifyEnabled` + `isShrinkResources` are wired up but **disabled by default**.
 When enabled, R8 pulls `classes.dex` down to ~4.89 MiB (worth roughly 1.5–2 MiB
 of the final `.apk`, because `classes.dex` is stored deflated) while keeping
-the ads SDK and plugins present in the output dex.
+the plugins present in the output dex.
 
-The catch: the ads SDK and the relay proxy are reflection-heavy, and
-minification has caused ad loading to stop working in the field. For ~2 MiB of
-savings that risk is not worth it, so it is off by default. If you want it back:
+The catch: some plugins are reflection-heavy, and minification can break them
+in subtle ways. For ~2 MiB of savings that risk is not worth it, so it is off
+by default. If you want it back:
 
 ```powershell
 flutter build apk --release --target-platform android-arm,android-arm64 -PcompressNativeLibs=true -PminifyRelease=true
 ```
 
-…and re-test ad display on a real device before shipping. Rules live in
-`android/app/proguard-rules.pro`.
+…and re-test on a real device before shipping.
 
 ABI selection is intentionally *not* set in Gradle: the Flutter Gradle plugin
 already derives `ndk.abiFilters` from `--target-platform`, and AGP rejects a

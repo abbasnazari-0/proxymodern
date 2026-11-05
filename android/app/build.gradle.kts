@@ -54,17 +54,16 @@ android {
             // ------------------------------------------------------------------
             // APK size tuning
             // ------------------------------------------------------------------
-            // R8 minification is OFF by default. It only saves ~2 MiB (classes.dex
-            // are reflection-heavy and minification can break ad loading in subtle
-            // ways. Re-enable with -PminifyRelease=true once ads are confirmed
-            // working, and re-test ad display before shipping.
+            // R8 minification is OFF by default. It only saves ~2 MiB and some
+            // plugins are reflection-heavy, so minification can break them in
+            // subtle ways. Re-enable with -PminifyRelease=true and re-test on a
+            // real device before shipping.
             val minifyRelease =
                 (project.findProperty("minifyRelease") as String?)?.toBoolean() ?: false
             isMinifyEnabled = minifyRelease
             isShrinkResources = minifyRelease
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
             )
         }
     }
