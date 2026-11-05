@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/firebase_service.dart';
+import '../../../../core/utils/mobile_ads_service.dart';
 
 /// A detail bottom sheet shown when the user taps a proxy in the list.
 ///
@@ -65,8 +68,23 @@ class ProxyInfoSheet {
 
   static Future<void> _connect(BuildContext context, String link) async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    // Legacy list mode has no loading overlay, so only reuse an already
+    // preloaded connect ad instead of blocking the tap on a fresh load.
+    final ads = MobileAdsService.instance;
+    if (ads.canShowNow && ads.isConnectAdLoaded) {
+      await ads.showConnectAd();
+      if (!context.mounted) return;
+    }
+
     final ok = await DataExtractor.launchUrl(link);
     if (ok) {
+      unawaited(
+        FirebaseService.instance.logEvent(
+          'proxy_opened',
+          <String, Object>{'source': 'info_sheet'},
+        ),
+      );
       Get.back();
       return;
     }
@@ -135,6 +153,7 @@ class ProxyInfoSheet {
     }
   }
 }
+
 class _ProxyInfoSheetBody extends StatelessWidget {
   const _ProxyInfoSheetBody({
     required this.link,
@@ -285,6 +304,7 @@ class _ProxyInfoSheetBody extends StatelessWidget {
       ),
     );
   }
+
   Widget _connectButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,

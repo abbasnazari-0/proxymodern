@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../../core/utils/constans.dart';
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/firebase_service.dart';
 import '../../../../core/utils/get_storage_data.dart';
+import '../../../../core/utils/mobile_ads_service.dart';
+import '../../../../core/utils/notification_service.dart';
 import '../../../../core/utils/page_status.dart';
 import '../controllers/channel_controller.dart';
 import '../widgets/app_about_sheet.dart';
@@ -27,8 +31,15 @@ class _ChannelScreenState extends State<ChannelScreen> {
   void initState() {
     super.initState();
     Get.put(ChannelController());
+    unawaited(FirebaseService.instance.logScreenView('channels'));
+    // ⚪ پردازش پیام اولیه (cold start) بعد از نمایش صفحهٔ اصلی.
+    unawaited(NotificationService.instance.handleInitialMessage());
     final saved = GetStorageData.getData(storageKeyLegacyListMode);
     _legacyListMode = saved == true;
+
+    // Preload the connect interstitial for both the modern and legacy views.
+    // The splash flow normally did this already; this is a no-op in that case.
+    unawaited(MobileAdsService.instance.preloadConnectAd());
   }
 
   Future<void> _setLegacyListMode(bool enabled) async {
@@ -116,6 +127,12 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
     HapticFeedback.mediumImpact();
 
+    // Start loading the connect interstitial while the proxy is being tested;
+    // the ad is only shown once a working proxy is found.
+    final ads = MobileAdsService.instance;
+    final connectAdReady =
+        ads.canShowNow ? ads.preloadConnectAd() : Future<bool>.value(false);
+
     final index = await c.findWorkingProxy(excludeIndex: exclude);
     if (!mounted) return;
 
@@ -142,10 +159,51 @@ class _ModernChannelViewState extends State<_ModernChannelView>
         ? item!.title!.trim()
         : "پروکسی آماده اتصال است";
 
+    // Show the connect interstitial before opening the Telegram sheet. A
+    // failing/absent ad never blocks the proxy dialog.
+    final adReady = await _waitForConnectAd(connectAdReady);
+    if (!mounted) return;
+    if (adReady) {
+      await ads.showConnectAd();
+      if (!mounted) return;
+    }
+
     await ProxyFoundSheet.show(
       link: link,
       caption: caption,
     );
+  }
+
+  /// Waits for the connect ad while showing a semi-transparent overlay. The
+  /// overlay is kept for a short minimum so a failed load never flashes.
+  Future<bool> _waitForConnectAd(Future<bool> adFuture) async {
+    final ads = MobileAdsService.instance;
+    if (!ads.hasConnectUnit) return false;
+    if (!ads.canShowNow) return false;
+    if (ads.isConnectAdLoaded) return true;
+
+    final overlayFuture = showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      barrierLabel: 'در حال آماده‌سازی سرویس ها...',
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return const Material(
+          color: Colors.transparent,
+          child: Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+        );
+      },
+    );
+
+    final ready = await adFuture;
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return false;
+    Navigator.of(context).pop();
+    await overlayFuture;
+    return ready;
   }
 
   String? get _link {
@@ -177,12 +235,12 @@ class _ModernChannelViewState extends State<_ModernChannelView>
   }
 
   String get _location {
-    final item = _index == null
-        ? null
-        : channelController.channelModel?.data?[_index!];
+    final item =
+        _index == null ? null : channelController.channelModel?.data?[_index!];
     final title = item?.title?.trim() ?? "";
     if (title.isNotEmpty) return title;
-    final host = _link == null ? null : DataExtractor.queryParam(_link!, "server");
+    final host =
+        _link == null ? null : DataExtractor.queryParam(_link!, "server");
     return (host == null || host.isEmpty) ? "—" : host;
   }
 
@@ -397,7 +455,8 @@ class _ModernChannelViewState extends State<_ModernChannelView>
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
                   child: Column(
                     children: [
-                      _header(controller.channelModel?.setting?.shouldUpdate == true),
+                      _header(controller.channelModel?.setting?.shouldUpdate ==
+                          true),
                       Expanded(child: _buttonSlot()),
                       _statusBlock(),
                       const SizedBox(height: 12),
@@ -415,28 +474,34 @@ class _ModernChannelViewState extends State<_ModernChannelView>
 
   Widget _header(bool hasUpdate) {
     return SizedBox(
-      height: 48,
+      height: 52,
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text("سوپر ", style: _text(size: 20, weight: FontWeight.w700)),
-                    Text(
-                      "پروکسی",
-                      style: _text(size: 20, weight: FontWeight.w700, color: _accent),
-                    ),
-                  ],
-                ),
-                Text(
-                  "وصل شدن داخل تلگرام",
-                  style: _text(size: 11, color: _muted),
-                ),
-              ],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text("سوپر ",
+                          style: _text(size: 20, weight: FontWeight.w700)),
+                      Text(
+                        "پروکسی",
+                        style: _text(
+                            size: 20, weight: FontWeight.w700, color: _accent),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    "وصل شدن داخل تلگرام",
+                    style: _text(size: 11, color: _muted),
+                  ),
+                ],
+              ),
             ),
           ),
           LegacyModeToggle(
@@ -451,7 +516,8 @@ class _ModernChannelViewState extends State<_ModernChannelView>
               isLabelVisible: hasUpdate,
               smallSize: 7,
               backgroundColor: _accent,
-              child: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+              child: const Icon(Icons.settings_outlined,
+                  color: Colors.white, size: 22),
             ),
           ),
         ],
@@ -465,7 +531,8 @@ class _ModernChannelViewState extends State<_ModernChannelView>
         _phase != FindPhase.searching;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = math.min(constraints.maxWidth * 0.62, constraints.maxHeight);
+        final side =
+            math.min(constraints.maxWidth * 0.62, constraints.maxHeight);
         return Center(
           child: GestureDetector(
             onTap: searching || booting ? null : () => _find(),
@@ -475,8 +542,7 @@ class _ModernChannelViewState extends State<_ModernChannelView>
               child: AnimatedBuilder(
                 animation: _pulse,
                 builder: (context, _) {
-                  final turn =
-                      searching || booting ? _pulse.value : -0.25;
+                  final turn = searching || booting ? _pulse.value : -0.25;
                   final strength = switch (_phase) {
                     FindPhase.found => 1.0,
                     FindPhase.searching => 0.95,
@@ -547,7 +613,8 @@ class _ModernChannelViewState extends State<_ModernChannelView>
             Container(
               width: 7,
               height: 7,
-              decoration: BoxDecoration(color: _statusColor, shape: BoxShape.circle),
+              decoration:
+                  BoxDecoration(color: _statusColor, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
             Text(_headline, style: _text(size: 17, weight: FontWeight.w700)),
@@ -592,7 +659,8 @@ class _ModernChannelViewState extends State<_ModernChannelView>
                   onTap: () => _find(exclude: _index),
                   child: Text(
                     "یکی دیگر",
-                    style: _text(size: 12, weight: FontWeight.w700, color: _accent),
+                    style: _text(
+                        size: 12, weight: FontWeight.w700, color: _accent),
                   ),
                 ),
             ],

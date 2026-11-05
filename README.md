@@ -28,3 +28,10 @@ That builds one APK per phone ABI (~20 MiB for `arm64-v8a`, ~18 MiB for
 `armeabi-v7a`) with R8/resource shrinking enabled. See
 [docs/apk_size.md](docs/apk_size.md) for the full size breakdown, the other
 build recipes and the remaining optimisation ideas.
+
+## Firebase
+
+Analytics, Cloud Messaging (topic `all`) and Performance Monitoring are wired
+up for the `space-sum` project. See [docs/firebase.md](docs/firebase.md) for the
+boot order, the topic re-subscription rules, the analytics event list and the
+remaining iOS setup steps.

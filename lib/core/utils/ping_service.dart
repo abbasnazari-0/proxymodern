@@ -55,6 +55,7 @@ class PingResult {
 
   bool get isAlive => latency > 0 && samples > 0;
 }
+
 /// A high-precision, concurrent TCP ping engine.
 ///
 /// Each host is probed [samplesPerHost] times (DNS resolution is performed

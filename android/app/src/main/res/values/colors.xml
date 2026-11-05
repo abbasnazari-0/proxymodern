@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent used for FCM notifications (matches the app's #3DDC97). -->
+    <color name="notification_accent">#FF3DDC97</color>
+</resources>

@@ -8,9 +8,9 @@ import 'package:proxymodern/core/utils/page_status.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/firebase_performance_interceptor.dart';
 import '../../../../core/utils/ping_service.dart';
 import '../../../../core/utils/proxy_report_service.dart';
-import '../../../feature_update/presentation/screens/feature_update.dart';
 import '../../data/model/channel_model.dart';
 
 enum FindPhase { idle, searching, found, failed }
@@ -51,14 +51,6 @@ class ChannelController extends GetxController {
     _channelFuture = getChannel(false);
   }
 
-  @override
-  void onReady() {
-    super.onReady();
-    // print("onReady");
-
-    getUpdateAvailable();
-  }
-
   Future<bool> getChannel(bool withload) async {
     final startedAt = DateTime.now();
     final hadData = channelModel?.data?.isNotEmpty ?? false;
@@ -88,7 +80,7 @@ class ChannelController extends GetxController {
           receiveTimeout: _requestTimeout,
           sendTimeout: _requestTimeout,
         ),
-      );
+      )..interceptors.add(FirebasePerformanceInterceptor());
 
       String platform = '';
       if (Platform.isAndroid) {
@@ -175,7 +167,6 @@ class ChannelController extends GetxController {
       return false;
     }
   }
-
 
   void _failLoad({
     required bool withload,
@@ -363,8 +354,7 @@ class ChannelController extends GetxController {
 
     findPhase = FindPhase.failed;
     errorTitle = "پروکسی سالم پیدا نشد";
-    errorMessage =
-        "سرورها پاسخ ندادند. چند لحظه بعد دوباره دکمه را بزن.";
+    errorMessage = "سرورها پاسخ ندادند. چند لحظه بعد دوباره دکمه را بزن.";
     update();
     return null;
   }
@@ -553,31 +543,6 @@ class ChannelController extends GetxController {
 
     if (res.statusCode == 200) {
       return res.data["flagUrl"];
-    }
-  }
-
-  getUpdateAvailable() async {
-    // Best-effort update check. GitHub raw is blocked in some networks (Iran),
-    // so never let it crash or spam unhandled exceptions.
-    try {
-      Dio dio = Dio();
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      String buildNumber = packageInfo.buildNumber;
-
-      var res = await dio.get(
-          "https://raw.githubusercontent.com/mosbahsofttechnology/proxy-modern/main/update");
-
-      if (res.statusCode == 200) {
-        if (Platform.isAndroid || Platform.isIOS) {
-          Map data = json.decode(res.data);
-
-          if (int.parse(data["version"]) > int.parse(buildNumber)) {
-            Get.offAll(() => UpdateScreen(url: data["link"]));
-          }
-        }
-      }
-    } catch (_) {
-      // ignore — update availability must not break the app
     }
   }
 }

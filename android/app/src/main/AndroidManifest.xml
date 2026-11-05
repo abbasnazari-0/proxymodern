@@ -3,6 +3,10 @@
  <!-- add internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- Android 13+ (API 33) requires the user to grant this at runtime. The
+         request is made once from NotificationService on first launch. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
      
     <application
         android:label="سوپر پروکسی"
@@ -37,6 +41,32 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- ⚡ Firebase Performance Monitoring: فعال‌سازی خودکار جمع‌آوری -->
+        <meta-data
+            android:name="firebase_performance_collection_deactivated"
+            android:value="false" />
+
+        <!-- FCM defaults.
+             The channel id must match NotificationService.channelId in Dart.
+             The channel is created by flutter_local_notifications on first
+             launch; FCM falls back to a default channel before that. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general_notifications" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+
+        <!-- Required by firebase_messaging 17+: `register()` / onRegistered use
+             Firebase Installations. Without this flag Android throws
+             "API disabled" and every topic subscription fails. -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
            
         <meta-data android:name="io.flutter.network-policy"
                  android:resource="@xml/network_security_config"/>   

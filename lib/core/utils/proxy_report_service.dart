@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'device_identifier.dart';
+import 'firebase_performance_interceptor.dart';
 
 /// Collects failed-proxy reports into a small in-memory queue and sends them
 /// to the server in batches (up to [batchSize] per request), plus a final
@@ -15,11 +16,10 @@ class ProxyReportService {
   static final ProxyReportService instance = ProxyReportService._();
 
   static const int batchSize = 5;
-  static const String endpoint =
-      "https://api.v1.te.cinimo.ir/proxy/report.php";
+  static const String endpoint = "https://api.v1.te.cinimo.ir/proxy/report.php";
 
-  final Dio _dio =
-      Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+  final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)))
+    ..interceptors.add(FirebasePerformanceInterceptor());
   final List<Map<String, dynamic>> _pending = [];
   bool _sending = false;
 
@@ -46,8 +46,7 @@ class ProxyReportService {
     _sending = true;
     try {
       while (_pending.isNotEmpty) {
-        final count =
-            _pending.length < batchSize ? _pending.length : batchSize;
+        final count = _pending.length < batchSize ? _pending.length : batchSize;
         final batch = _pending.sublist(0, count);
         _pending.removeRange(0, count);
         await _send(batch);

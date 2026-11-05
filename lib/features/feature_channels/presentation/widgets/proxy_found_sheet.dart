@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/data_extractor.dart';
+import '../../../../core/utils/firebase_service.dart';
 
 class ProxyFoundSheet {
   static const _card = Color(0xFF101820);
@@ -57,6 +59,12 @@ class ProxyFoundSheet {
     if (!Platform.isAndroid && !Platform.isIOS) return;
     final ok = await DataExtractor.launchUrl(link);
     if (ok) {
+      unawaited(
+        FirebaseService.instance.logEvent(
+          'proxy_opened',
+          <String, Object>{'source': 'found_sheet'},
+        ),
+      );
       Get.back();
       return;
     }

@@ -177,7 +177,8 @@ class _AppAboutSheetBody extends StatelessWidget {
                                 setting?.udateUrl ?? AppAboutSheet._storeUrl,
                               );
                             },
-                            icon: const Icon(Icons.system_update_rounded, size: 18),
+                            icon: const Icon(Icons.system_update_rounded,
+                                size: 18),
                             label: Text(
                               setting?.updateTitle ?? "به‌روزرسانی",
                               style: AppAboutSheet._text(

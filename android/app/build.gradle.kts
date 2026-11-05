@@ -1,9 +1,13 @@
 import java.io.FileInputStream
 import java.util.Properties
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    // Reads android/app/google-services.json (Firebase project `space-sum`).
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -14,18 +18,40 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// Release signing is optional for local development. Only create the release
+// signing config when key.properties exists AND contains all four values;
+// otherwise Gradle would crash at configuration time (even for debug builds)
+// with: "null cannot be cast to non-null type kotlin.String".
+val releaseKeystoreKeys =
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseKeystore =
+    keystorePropertiesFile.exists() &&
+        releaseKeystoreKeys.all {
+            !keystoreProperties.getProperty(it).isNullOrBlank()
+        }
+if (keystorePropertiesFile.exists() && !hasReleaseKeystore) {
+    logger.warn(
+        "android/key.properties exists but is incomplete; " +
+            "the release build will use the debug signing key.",
+    )
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 android {
     namespace = "af.arianadeveloper.proxymodern"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        // لازم برای flutter_local_notifications (نمایش نوتیفیکیشن در Foreground)
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
@@ -38,18 +64,28 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile =
+                    keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
         }
     }
 
     buildTypes {
         release {
-            // Signing with the release upload key (movie-chi-keystore.jks).
-            signingConfig = signingConfigs.getByName("release")
+            // Uses the real upload key when android/key.properties is present;
+            // otherwise falls back to the debug key so `flutter run`/debug and
+            // local release builds keep working without a keystore.
+            signingConfig =
+                if (hasReleaseKeystore) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
 
             // ------------------------------------------------------------------
             // APK size tuning
@@ -64,6 +100,7 @@ android {
             isShrinkResources = minifyRelease
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
             )
         }
     }
@@ -81,6 +118,12 @@ android {
             useLegacyPackaging = compressNativeLibs
         }
     }
+}
+
+dependencies {
+    // Required by flutter_local_notifications (java.time backport on older
+    // devices). Keep at 2.1.4+ whenever AGP is upgraded.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {

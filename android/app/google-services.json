@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "104331095974",
+    "project_id": "space-sum",
+    "storage_bucket": "space-sum.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:104331095974:android:c0d161ad0ad29ab68fa967",
+        "android_client_info": {
+          "package_name": "af.arianadeveloper.proxymodern"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAneg5h7dTQ6SE1ibZ62TojcI5X4PQvHmE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:104331095974:android:d10bf3e33bcd45338fa967",
+        "android_client_info": {
+          "package_name": "com.arianadeveloper.spacesum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAneg5h7dTQ6SE1ibZ62TojcI5X4PQvHmE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

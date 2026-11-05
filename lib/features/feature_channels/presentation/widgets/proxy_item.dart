@@ -69,7 +69,8 @@ class ProxyItemWidget extends StatelessWidget {
               _pingBadge(),
               if (clickable) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_left_rounded, color: Colors.white24, size: 20),
+                Icon(Icons.chevron_left_rounded,
+                    color: Colors.white24, size: 20),
               ],
             ],
           ),
